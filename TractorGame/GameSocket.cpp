@@ -39,21 +39,21 @@ void CGameSocket::OnConnect(int nErrorCode)
 {
 	CTractorGameApp* pApp= (CTractorGameApp*)AfxGetApp();
 	CTractorGameDlg* pDlg= (CTractorGameDlg*)pApp->m_pMainWnd;
-	CRichEditCtrl* msg_ctrl = (CRichEditCtrl*)pDlg->GetDlgItem(IDC_MSG);
-	CString str;
-	msg_ctrl->GetWindowText(str);
 
 	if(nErrorCode == 0)
 	{
 		IsConnected = TRUE;
-		str += _T("connect to Interface successful.");
-		msg_ctrl->SetWindowText(str);
+		pDlg->GetAllRoom();
 	}
 	else
 	{
+		CRichEditCtrl* msg_ctrl = (CRichEditCtrl*)pDlg->GetDlgItem(IDC_MSG);
+		CString str;
+		msg_ctrl->GetWindowText(str);
 		str += _T("connect to Interface failed.");
 		msg_ctrl->SetWindowText(str);
 	}
+
 	CAsyncSocket::OnConnect(nErrorCode);
 }
 

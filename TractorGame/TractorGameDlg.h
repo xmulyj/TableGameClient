@@ -8,6 +8,11 @@
 #include "GameSocket.h"
 #include "RoomSocket.h"
 
+typedef enum 
+{
+	Status_PrintRoomList,
+}ClientStatus;
+
 // CTractorGameDlg ¶Ô»°¿ò
 class CTractorGameDlg : public CDialog
 {
@@ -37,4 +42,8 @@ public:
 
 	CGameSocket m_GameSocket;
 	CGameSocket m_RoomSocket;
+
+	ClientStatus m_CurStatus;
+	void GetAllRoom();
+	bool OnGetAllRoomRsp();
 };

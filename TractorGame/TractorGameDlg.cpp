@@ -111,8 +111,8 @@ BOOL CTractorGameDlg::OnInitDialog()
 	m_RoomListCtrl.SetItemText(1, 1, _T("1"));
 	m_RoomListCtrl.SetItemText(1, 2, _T("3"));
 
-	WSADATA wsadata;
-	WSAStartup(MAKEWORD(2,0), &wsadata);
+	//WSADATA wsadata;
+	//WSAStartup(MAKEWORD(2,0), &wsadata);
 
 	m_GameSocket.Create();
 	m_RoomSocket.Create();
@@ -124,7 +124,11 @@ BOOL CTractorGameDlg::OnInitDialog()
 	str += _T("connect to Interface,wait please...\r\n");
 	msg_ctrl->SetWindowText(str);
 
-	m_GameSocket.Connect(_T("192.168.0.2"), 3000);
+	if(TRUE==m_GameSocket.Connect(_T("192.168.0.2"), 3000))
+	{
+		m_CurStatus = Status_PrintRoomList;
+		GetAllRoom();
+	}
 
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -178,3 +182,12 @@ HCURSOR CTractorGameDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+void CTractorGameDlg::GetAllRoom()
+{
+	if(m_CurStatus != Status_PrintRoomList)
+	{
+		return ;
+	}
+
+
+}
