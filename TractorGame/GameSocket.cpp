@@ -24,7 +24,7 @@ void CGameSocket::OnReceive(int nErrorCode)
 	CTractorGameApp* pApp= (CTractorGameApp*)AfxGetApp();
 	CTractorGameDlg* pDlg= (CTractorGameDlg*)pApp->m_pMainWnd;
 
-	pDlg->OnGetAllRoomRsp();
+	pDlg->OnInterfaceRsp();
 
 	CAsyncSocket::OnReceive(nErrorCode);
 }

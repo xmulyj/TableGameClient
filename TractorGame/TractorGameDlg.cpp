@@ -260,10 +260,9 @@ bool CTractorGameDlg::GetAllRoomReq()
 	KillTimer(1);
 	return true;
 }
-
-bool CTractorGameDlg::OnGetAllRoomRsp()
+bool CTractorGameDlg::OnInterfaceRsp()
 {
-		//recv resp
+	//recv resp
 	KVDataProtocolFactory factory;
 	ProtocolContext context;
 
@@ -290,18 +289,29 @@ bool CTractorGameDlg::OnGetAllRoomRsp()
 
 	KVData *recv_kvdata = (KVData*)context.protocol;
 	int Protocol;
+	recv_kvdata->GetValue(KEY_Protocol, Protocol);
+	if(Protocol == GetAllRoomRsp)
+		OnGetAllRoomRsp(recv_kvdata);
+	else if(Protocol == GetRoomAddr)
+		OnGetRoomAddrRsp(recv_kvdata);
+	else
+		assert(0);
+	factory.DeleteProtocol(-1, context.protocol);
+	return true;
+}
+
+
+bool CTractorGameDlg::OnGetAllRoomRsp(KVData *kvdata)
+{
 	int RoomNum;
 	char *NumArray;
 
-	recv_kvdata->GetValue(KEY_Protocol, Protocol);
-	assert(Protocol == GetAllRoomRsp);
-	recv_kvdata->GetValue(KEY_RoomNum, RoomNum);
-
+	kvdata->GetValue(KEY_RoomNum, RoomNum);
 	m_RoomList.clear();
 	if(RoomNum > 0)
 	{
 		uint32_t size;
-		recv_kvdata->GetValue(KEY_NumArray, NumArray, size);
+		kvdata->GetValue(KEY_NumArray, NumArray, size);
 		assert(size == RoomNum*sizeof(int)*2);
 		int *temp_buff = (int*)NumArray;
 		for(int i=0; i<RoomNum; ++i)
@@ -309,12 +319,10 @@ bool CTractorGameDlg::OnGetAllRoomRsp()
 			RoomInfo room_info;
 			room_info.RoomID = ntohl(temp_buff[0]);
 			room_info.ClientNum = ntohl(temp_buff[1]);
-			room_info.fd = -1;
 			temp_buff += 2;
 			m_RoomList.push_back(room_info);
 		}
 	}
-	factory.DeleteProtocol(-1, context.protocol);
 
 	m_RoomListCtrl.DeleteAllItems();
 	for(int i=0; i<m_RoomList.size(); ++i)
@@ -334,6 +342,11 @@ bool CTractorGameDlg::OnGetAllRoomRsp()
 	return true;
 }
 
+bool CTractorGameDlg::OnGetRoomAddrRsp(KVData *kvdata)
+{
+
+}
+
 void CTractorGameDlg::PrintTableList()
 {
 	if(m_CurStatus != Status_PrintTableList)
@@ -342,8 +355,53 @@ void CTractorGameDlg::PrintTableList()
 		return ;
 	}
 
-	GetRoomInfoReq();
+	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
+	if(!m_RoomSocket.IsConnected)
+	{
+		GetRoomAddrReq();
+	}
 }
+
+bool CTractorGameDlg::GetRoomAddrReq()
+{
+	if(!m_GameSocket.IsConnected)
+	{
+		//connect to interface
+		AppendMsg(_T("connect to game_interface,wait please...\r\n"));
+
+		if(TRUE==m_GameSocket.Connect(_T("192.168.80.130"), 3000))
+		{
+			m_CurStatus = Status_PrintRoomList;
+			m_GameSocket.IsConnected = TRUE;
+
+			AppendMsg(_T("connect game_interface successful.\r\n"));
+		}
+		else
+		{
+			return true;
+		}
+	}
+
+	KVData kvdata(true);
+	kvdata.SetValue(KEY_Protocol, GetRoomAddr);
+	kvdata.SetValue(KEY_RoomID, room_info.RoomID);
+	kvdata.SetValue(KEY_ClientID, gUID);
+	kvdata.SetValue(KEY_ClientName, gUName);
+
+	KVDataProtocolFactory factory;
+	unsigned int header_size = factory.HeaderSize();
+	unsigned int body_size = kvdata.Size();
+	ProtocolContext *context = new ProtocolContext(header_size+body_size);
+
+	kvdata.Serialize(context->Buffer+header_size);
+	context->Size = header_size+body_size;
+	factory.EncodeHeader(context->Buffer, body_size);
+
+	m_GameSocket->m_SendContext = context;
+	return true;
+}
+
+
 
 bool CTractorGameDlg::GetRoomInfoReq()
 {
@@ -363,7 +421,7 @@ bool CTractorGameDlg::GetRoomInfoReq()
 		}
 	}
 
-
+	
 	return true;
 }
 

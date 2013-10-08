@@ -25,9 +25,7 @@ typedef struct _room_info
 	string      IP;
 	int         Port;
 
-	int         fd;  //连接
 	vector<int> TableArray;  //每桌玩家数量
-
 }RoomInfo;
 
 // CTractorGameDlg 对话框
@@ -66,8 +64,12 @@ public:
 	ClientStatus m_CurStatus;
 	
 	void PrintRoomList();
+	bool OnInterfaceRsp();
+
 	bool GetAllRoomReq();
-	bool OnGetAllRoomRsp();
+	bool GetRoomAddrReq();
+	bool OnGetAllRoomRsp(KVData *kvdata);
+	bool OnGetRoomAddrRsp(KVData *kvdata);
 
 	void PrintTableList();
 	bool GetRoomInfoReq();
