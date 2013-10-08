@@ -1,4 +1,4 @@
-/*
+﻿/*
  * IProtocolFactory.h
  *
  *  Created on: 2013-5-4
@@ -6,10 +6,15 @@
  */
 #ifndef _FRAMEWORK_IPROTOCOL_FACTORY_H_
 #define _FRAMEWORK_IPROTOCOL_FACTORY_H_
-#include <stdint.h>
 #include <assert.h>
 #include <string>
 using std::string;
+
+#if defined(LINUX)
+#include <stdint.h>
+#elif defined(WIN32)
+#include "_stdint.h"
+#endif
 
 #include "IMemory.h"
 #include "ByteBuffer.h"

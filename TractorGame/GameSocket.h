@@ -1,6 +1,8 @@
 #pragma once
 
 // CGameSocket ÃüÁîÄ¿±ê
+#include "common/KVDataProtocolFactory.h"
+using namespace easynet;
 
 class CGameSocket : public CAsyncSocket
 {
@@ -16,6 +18,8 @@ public:
 	void OnClose(int nErrorCode);
 
 	BOOL IsConnected;
+
+	ProtocolContext *m_SendContext;
 };
 
 

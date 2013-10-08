@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ByteBuffer.cpp
  *
  *  Created on: 2013-5-24

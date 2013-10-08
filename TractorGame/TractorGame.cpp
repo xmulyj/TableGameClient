@@ -48,6 +48,8 @@ BOOL CTractorGameApp::InitInstance()
 
 	CWinAppEx::InitInstance();
 
+	AfxInitRichEdit2();    //added by yongjinliu@20131008
+
 	if (!AfxSocketInit())
 	{
 		AfxMessageBox(IDP_SOCKETS_INIT_FAILED);

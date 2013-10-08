@@ -1,4 +1,4 @@
-/*
+﻿/*
  * IMemory.h
  *
  *  Created on: 2013-5-18
@@ -7,8 +7,13 @@
 
 #ifndef _COMMON_IMEMORY_H_
 #define _COMMON_IMEMORY_H_
-#include <stdint.h>
 #include <stdlib.h>
+
+#if defined(LINUX)
+#include <stdint.h>
+#elif defined(WIN32)
+#include "_stdint.h"
+#endif
 
 namespace easynet
 {

@@ -9,7 +9,7 @@
 
 // CGameSocket
 
-CGameSocket::CGameSocket():IsConnected(FALSE)
+CGameSocket::CGameSocket():IsConnected(FALSE),m_SendContext(NULL)
 {
 }
 
@@ -21,12 +21,34 @@ CGameSocket::~CGameSocket()
 // CGameSocket ³ÉÔ±º¯Êý
 void CGameSocket::OnReceive(int nErrorCode)
 {
+	CTractorGameApp* pApp= (CTractorGameApp*)AfxGetApp();
+	CTractorGameDlg* pDlg= (CTractorGameDlg*)pApp->m_pMainWnd;
 
+	pDlg->OnGetAllRoomRsp();
+
+	CAsyncSocket::OnReceive(nErrorCode);
 }
+
 void CGameSocket::OnSend(int nErrorCode)
 {
+	if(m_SendContext == NULL)
+		return ;
 
+	uint32_t send_size = 0;
+	while(send_size < m_SendContext->Size)
+	{
+		int ret = Send(m_SendContext->Buffer, m_SendContext->Size-send_size, 0);
+		if(ret != SOCKET_ERROR)
+			send_size += ret;
+	}
+
+	delete m_SendContext;
+	m_SendContext = NULL;
+
+	AsyncSelect(FD_READ);
+	CAsyncSocket::OnSend(nErrorCode);
 }
+
 void CGameSocket::OnOutOfBandData(int nErrorCode)
 {
 
@@ -43,15 +65,13 @@ void CGameSocket::OnConnect(int nErrorCode)
 	if(nErrorCode == 0)
 	{
 		IsConnected = TRUE;
-		pDlg->GetAllRoom();
+
+		pDlg->AppendMsg(_T("connect game_interface successful.\r\n"));
+		pDlg->PrintRoomList();
 	}
 	else
 	{
-		CRichEditCtrl* msg_ctrl = (CRichEditCtrl*)pDlg->GetDlgItem(IDC_MSG);
-		CString str;
-		msg_ctrl->GetWindowText(str);
-		str += _T("connect to Interface failed.");
-		msg_ctrl->SetWindowText(str);
+		pDlg->AppendMsg(_T("connect game_interface failed.\r\n"));
 	}
 
 	CAsyncSocket::OnConnect(nErrorCode);
@@ -59,5 +79,5 @@ void CGameSocket::OnConnect(int nErrorCode)
 
 void CGameSocket::OnClose(int nErrorCode)
 {
-
+	IsConnected = FALSE;
 }

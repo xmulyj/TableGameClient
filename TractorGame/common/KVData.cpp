@@ -1,4 +1,4 @@
-/*
+﻿/*
  * KVData.cpp
  *
  *  Created on: 2013-5-24
@@ -9,7 +9,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#if defined(LINUX)
 #include <netinet/in.h>
+#elif defined(WIN32)
+#include <WinSock2.h>
+#endif
 
 namespace easynet
 {
