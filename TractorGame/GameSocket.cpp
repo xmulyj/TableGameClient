@@ -57,24 +57,31 @@ void CGameSocket::OnAccept(int nErrorCode)
 {
 
 }
+
 void CGameSocket::OnConnect(int nErrorCode)
 {
 	CTractorGameApp* pApp= (CTractorGameApp*)AfxGetApp();
 	CTractorGameDlg* pDlg= (CTractorGameDlg*)pApp->m_pMainWnd;
 
+	pDlg->AppendMsg(_T("OnConnect game_interface\r\n"));
 	if(nErrorCode == 0)
 	{
 		IsConnected = TRUE;
 
 		pDlg->AppendMsg(_T("connect game_interface successful.\r\n"));
-		pDlg->PrintRoomList();
+		if(pDlg->m_CurStatus == Status_PrintRoomList)
+			pDlg->PrintRoomList();
+		else if(pDlg->m_CurStatus == Status_PrintTableList)
+			pDlg->GetRoomAddrReq();
+		else
+			assert(0);
 	}
 	else
 	{
 		pDlg->AppendMsg(_T("connect game_interface failed.\r\n"));
 	}
 
-	CAsyncSocket::OnConnect(nErrorCode);
+	//CAsyncSocket::OnConnect(nErrorCode);
 }
 
 void CGameSocket::OnClose(int nErrorCode)

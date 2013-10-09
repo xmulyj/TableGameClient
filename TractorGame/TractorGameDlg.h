@@ -59,7 +59,7 @@ public:
 	CListCtrl m_TableListCtrl;
 
 	CGameSocket m_GameSocket;
-	CGameSocket m_RoomSocket;
+	CRoomSocket m_RoomSocket;
 
 	ClientStatus m_CurStatus;
 	
@@ -67,13 +67,15 @@ public:
 	bool OnInterfaceRsp();
 
 	bool GetAllRoomReq();
-	bool GetRoomAddrReq();
 	bool OnGetAllRoomRsp(KVData *kvdata);
+	bool GetRoomAddrReq();
 	bool OnGetRoomAddrRsp(KVData *kvdata);
 
 	void PrintTableList();
+	void OnRoomRsp();
+
 	bool GetRoomInfoReq();
-	bool OnGetRoomInfoRsp();
+	bool OnGetRoomInfoRsp(KVData *kvdata);
 public:
 	int m_UID;
 	string m_UName;
