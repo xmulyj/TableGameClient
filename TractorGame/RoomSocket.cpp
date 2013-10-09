@@ -26,6 +26,7 @@ void CRoomSocket::OnReceive(int nErrorCode)
 
 	pDlg->OnRoomRsp();
 
+	AsyncSelect(FD_READ|FD_CLOSE);
 	CAsyncSocket::OnReceive(nErrorCode);
 }
 
@@ -45,8 +46,7 @@ void CRoomSocket::OnSend(int nErrorCode)
 	delete m_SendContext;
 	m_SendContext = NULL;
 
-	AsyncSelect(FD_READ);
-	CAsyncSocket::OnSend(nErrorCode);
+	AsyncSelect(FD_READ|FD_CLOSE);
 }
 
 void CRoomSocket::OnOutOfBandData(int nErrorCode)
@@ -79,11 +79,13 @@ void CRoomSocket::OnConnect(int nErrorCode)
 	{
 		pDlg->AppendMsg(_T("connect game room failed.\r\n"));
 	}
-
-	//CAsyncSocket::OnConnect(nErrorCode);
 }
 
 void CRoomSocket::OnClose(int nErrorCode)
 {
+	CTractorGameApp* pApp= (CTractorGameApp*)AfxGetApp();
+	CTractorGameDlg* pDlg= (CTractorGameDlg*)pApp->m_pMainWnd;
+	pDlg->AppendMsg(_T("game room close socket.\r\n"));
 	IsConnected = FALSE;
+	Close();
 }

@@ -15,6 +15,7 @@ using namespace easynet;
 #define new DEBUG_NEW
 #endif
 
+#define INTERFACE_IP  _T("192.168.80.130")
 
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
 
@@ -71,8 +72,8 @@ BEGIN_MESSAGE_MAP(CTractorGameDlg, CDialog)
 	ON_WM_QUERYDRAGICON()
 	//}}AFX_MSG_MAP
 	ON_BN_CLICKED(IDC_LOAD, &CTractorGameDlg::OnBnClickedLoad)
+	ON_BN_CLICKED(IDC_STATIC_LIST, &CTractorGameDlg::OnStaticListClick)
 	ON_WM_TIMER()
-	ON_NOTIFY(LVN_ITEMCHANGED, IDC_RoomList, &CTractorGameDlg::OnLvnItemchangedRoomlist)
 	ON_NOTIFY(NM_DBLCLK, IDC_RoomList, &CTractorGameDlg::OnNMDblclkRoomlist)
 END_MESSAGE_MAP()
 
@@ -134,9 +135,6 @@ BOOL CTractorGameDlg::OnInitDialog()
 	*/
 	//WSADATA wsadata;
 	//WSAStartup(MAKEWORD(2,0), &wsadata);
-
-	m_GameSocket.Create();
-	m_RoomSocket.Create();
 
 	m_CurStatus = Status_PrintRoomList;
 
@@ -219,7 +217,8 @@ bool CTractorGameDlg::GetAllRoomReq()
 		//connect to interface
 		AppendMsg(_T("connect to game_interface,wait please...\r\n"));
 
-		if(TRUE==m_GameSocket.Connect(_T("192.168.80.130"), 3000))
+		m_GameSocket.Create();
+		if(TRUE==m_GameSocket.Connect(INTERFACE_IP, 3000))
 		{
 			m_CurStatus = Status_PrintRoomList;
 			m_GameSocket.IsConnected = TRUE;
@@ -228,6 +227,20 @@ bool CTractorGameDlg::GetAllRoomReq()
 		}
 		else
 		{
+			CString temp;
+			uint32_t error_code = WSAGetLastError();
+
+			if(error_code == WSAEWOULDBLOCK)
+			{
+				temp.Format(_T("connect interface WouldBlock\r\n"));
+				AppendMsg(temp);
+				m_GameSocket.AsyncSelect(FD_READ|FD_CONNECT);
+			}
+			else
+			{
+				temp.Format(_T("connect interface failed. error_code=%u\r\n"), error_code);
+				AppendMsg(temp);
+			}
 			return true;
 		}
 	}
@@ -255,7 +268,7 @@ bool CTractorGameDlg::GetAllRoomReq()
 	factory.EncodeHeader(context.Buffer, body_size);
 
 	m_GameSocket.m_SendContext = context_tmp;
-	m_GameSocket.AsyncSelect(FD_WRITE);
+	m_GameSocket.AsyncSelect(FD_WRITE|FD_CLOSE);;
 
 	return true;
 }
@@ -273,12 +286,14 @@ bool CTractorGameDlg::OnInterfaceRsp()
 	if(recv_size == 0)
 	{
 		m_GameSocket.IsConnected = FALSE;
+		m_GameSocket.Close();
+		AppendMsg(_T("game interface close connect\r\n"));
 		return false;
 	}
 	else if(recv_size < 0)
 	{
 		CString temp;
-		temp.Format(_T("Error: OnInterfaceRsp:%d\r\n"),GetLastError());
+		temp.Format(_T("Error: OnInterfaceRsp:%u\r\n"),WSAGetLastError());
 		AppendMsg(temp);
 		return false;
 	}
@@ -340,12 +355,15 @@ bool CTractorGameDlg::OnGetAllRoomRsp(KVData *kvdata)
 	if(m_CurStatus != Status_PrintRoomList)
 		return true;
 
-	m_RoomListCtrl.DeleteAllItems();
-	for(int i=0; i<m_RoomList.size(); ++i)
+	int i=0;
+	for(i=0; i<m_RoomList.size(); ++i)  //替换现有的
 	{
 		CString temp;
 		temp.Format(_T("%d"), i+1);
-		m_RoomListCtrl.InsertItem(i, temp);
+		if(i < m_RoomListCtrl.GetItemCount())
+			m_RoomListCtrl.SetItemText(i, 0, temp);
+		else
+			m_RoomListCtrl.InsertItem(i, temp);
 
 		temp.Format(_T("%d"), m_RoomList[i].RoomID);
 		m_RoomListCtrl.SetItemText(i, 1, temp);
@@ -353,6 +371,8 @@ bool CTractorGameDlg::OnGetAllRoomRsp(KVData *kvdata)
 		temp.Format(_T("%d"), m_RoomList[i].ClientNum);
 		m_RoomListCtrl.SetItemText(i, 2, temp);
 	}
+	for(; i<m_RoomListCtrl.GetItemCount(); ++i)  //删除多余的
+		m_RoomListCtrl.DeleteItem(i);
 
 	SetTimer(1, 2000, NULL);
 	return true;
@@ -366,7 +386,8 @@ bool CTractorGameDlg::GetRoomAddrReq()
 		//connect to interface
 		AppendMsg(_T("connect to game interface,wait please...\r\n"));
 
-		if(TRUE==m_GameSocket.Connect(_T("192.168.80.130"), 3000))
+		m_GameSocket.Create();
+		if(TRUE==m_GameSocket.Connect(INTERFACE_IP, 3000))
 		{
 			m_CurStatus = Status_PrintRoomList;
 			m_GameSocket.IsConnected = TRUE;
@@ -375,6 +396,19 @@ bool CTractorGameDlg::GetRoomAddrReq()
 		}
 		else
 		{
+			uint32_t error_code = WSAGetLastError();
+			CString temp;
+			if(error_code == WSAEWOULDBLOCK)
+			{
+				temp.Format(_T("connect interface WouldBlock\r\n"));
+				AppendMsg(temp);
+				m_GameSocket.AsyncSelect(FD_READ|FD_CONNECT);
+			}
+			else
+			{
+				temp.Format(_T("connect interface failed. error_code=%u\r\n"), error_code);
+				AppendMsg(temp);
+			}
 			return true;
 		}
 	}
@@ -399,7 +433,7 @@ bool CTractorGameDlg::GetRoomAddrReq()
 	factory.EncodeHeader(context->Buffer, body_size);
 
 	m_GameSocket.m_SendContext = context;
-	m_GameSocket.AsyncSelect(FD_WRITE);
+	m_GameSocket.AsyncSelect(FD_WRITE|FD_CLOSE);
 	return true;
 }
 
@@ -449,6 +483,7 @@ bool CTractorGameDlg::GetRoomInfoReq()
 		assert(m_SelectRoomIndex>=0 && m_SelectRoomIndex<m_RoomList.size());
 		RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
 		CString IP(room_info.IP.c_str());
+		m_RoomSocket.Create();
 		if(TRUE==m_RoomSocket.Connect(IP, room_info.Port))
 		{
 			m_RoomSocket.IsConnected = TRUE;
@@ -456,6 +491,19 @@ bool CTractorGameDlg::GetRoomInfoReq()
 		}
 		else
 		{
+			uint32_t error_code = WSAGetLastError();
+			CString temp;
+			if(error_code == WSAEWOULDBLOCK)
+			{
+				temp.Format(_T("connect game room WouldBlock\r\n"));
+				AppendMsg(temp);
+				m_GameSocket.AsyncSelect(FD_READ|FD_CONNECT);
+			}
+			else
+			{
+				temp.Format(_T("connect interface failed. error_code=%u\r\n"), error_code);
+				AppendMsg(temp);
+			}
 			return true;
 		}
 	}
@@ -564,15 +612,21 @@ bool CTractorGameDlg::OnGetRoomInfoRsp(KVData *kvdata)
 		temp.Format(_T("->房间[%02d] %d 人"), room_info.RoomID, room_info.ClientNum);
 		GetDlgItem(IDC_STATIC_ROOM)->SetWindowText(temp);
 
-		m_TableListCtrl.DeleteAllItems();
-		for(int i=0; i<room_info.TableArray.size(); ++i)
+		int i=0;
+		for(i=0; i<room_info.TableArray.size(); ++i)  //替换现有的
 		{
 			temp.Format(_T("%d"), i+1);
-			m_TableListCtrl.InsertItem(i, temp);
+			if(i < m_TableListCtrl.GetItemCount())
+				m_TableListCtrl.SetItemText(i, 0, temp);
+			else
+				m_TableListCtrl.InsertItem(i, temp);
 
 			temp.Format(_T("%d"), room_info.TableArray[i]);
 			m_TableListCtrl.SetItemText(i, 1, temp);
 		}
+
+		for(; i<m_TableListCtrl.GetItemCount(); ++i)  //删掉多余的
+			m_TableListCtrl.DeleteItem(i);
 	}
 
 	SetTimer(2, 2000, NULL);
@@ -609,6 +663,20 @@ void CTractorGameDlg::OnBnClickedLoad()
 	PrintRoomList();
 }
 
+void CTractorGameDlg::OnStaticListClick()
+{
+	if(m_CurStatus == Status_PrintTableList)
+	{
+		KillTimer(2);
+		m_TableListCtrl.ShowWindow(SW_HIDE);
+		GetDlgItem(IDC_STATIC_ROOM)->ShowWindow(SW_HIDE);
+		m_RoomListCtrl.ShowWindow(SW_NORMAL);
+	
+		m_CurStatus = Status_PrintRoomList;
+		PrintRoomList();
+	}
+}
+
 void CTractorGameDlg::OnTimer(UINT_PTR nIDEvent)
 {
 	// TODO: 在此添加消息处理程序代码和/或调用默认值
@@ -623,13 +691,6 @@ void CTractorGameDlg::OnTimer(UINT_PTR nIDEvent)
 		PrintTableList();
 	}
 	CDialog::OnTimer(nIDEvent);
-}
-
-void CTractorGameDlg::OnLvnItemchangedRoomlist(NMHDR *pNMHDR, LRESULT *pResult)
-{
-	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
-	// TODO: 在此添加控件通知处理程序代码
-	*pResult = 0;
 }
 
 void CTractorGameDlg::OnNMDblclkRoomlist(NMHDR *pNMHDR, LRESULT *pResult)

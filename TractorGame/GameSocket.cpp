@@ -26,7 +26,7 @@ void CGameSocket::OnReceive(int nErrorCode)
 
 	pDlg->OnInterfaceRsp();
 
-	CAsyncSocket::OnReceive(nErrorCode);
+	AsyncSelect(FD_READ|FD_CLOSE);
 }
 
 void CGameSocket::OnSend(int nErrorCode)
@@ -40,13 +40,14 @@ void CGameSocket::OnSend(int nErrorCode)
 		int ret = Send(m_SendContext->Buffer, m_SendContext->Size-send_size, 0);
 		if(ret != SOCKET_ERROR)
 			send_size += ret;
+		else
+			break;
 	}
 
 	delete m_SendContext;
 	m_SendContext = NULL;
 
-	AsyncSelect(FD_READ);
-	CAsyncSocket::OnSend(nErrorCode);
+	AsyncSelect(FD_READ|FD_CLOSE);
 }
 
 void CGameSocket::OnOutOfBandData(int nErrorCode)
@@ -80,11 +81,14 @@ void CGameSocket::OnConnect(int nErrorCode)
 	{
 		pDlg->AppendMsg(_T("connect game_interface failed.\r\n"));
 	}
-
-	//CAsyncSocket::OnConnect(nErrorCode);
 }
 
 void CGameSocket::OnClose(int nErrorCode)
 {
+	CTractorGameApp* pApp= (CTractorGameApp*)AfxGetApp();
+	CTractorGameDlg* pDlg= (CTractorGameDlg*)pApp->m_pMainWnd;
+	pDlg->AppendMsg(_T("game_interface close socket.\r\n"));
 	IsConnected = FALSE;
+
+	Close();
 }

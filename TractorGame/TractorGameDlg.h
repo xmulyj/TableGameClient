@@ -84,7 +84,7 @@ public:
 	vector<RoomInfo> m_RoomList;
 
 	afx_msg void OnBnClickedLoad();
+	afx_msg void OnStaticListClick();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
-	afx_msg void OnLvnItemchangedRoomlist(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnNMDblclkRoomlist(NMHDR *pNMHDR, LRESULT *pResult);
 };
