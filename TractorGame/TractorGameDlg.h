@@ -16,6 +16,7 @@ typedef enum
 {
 	Status_PrintRoomList,
 	Status_PrintTableList,
+	Status_Playing,
 }ClientStatus;
 
 typedef struct _room_info
@@ -27,6 +28,12 @@ typedef struct _room_info
 
 	vector<int> TableArray;  //每桌玩家数量
 }RoomInfo;
+
+typedef struct _player_status_
+{
+	int client_id;
+	int	status;
+}PlayerStatus;
 
 // CTractorGameDlg 对话框
 class CTractorGameDlg : public CDialog
@@ -63,28 +70,35 @@ public:
 
 	ClientStatus m_CurStatus;
 	
+	//显示房间列表
 	void PrintRoomList();
 	bool OnInterfaceRsp();
-
 	bool GetAllRoomReq();
 	bool OnGetAllRoomRsp(KVData *kvdata);
 	bool GetRoomAddrReq();
 	bool OnGetRoomAddrRsp(KVData *kvdata);
 
+	//显示桌子列表
 	void PrintTableList();
 	void OnRoomRsp();
-
 	bool GetRoomInfoReq();
 	bool OnGetRoomInfoRsp(KVData *kvdata);
+	
+	//开始玩游戏
+	void OnAddGame();
+	void OnAddGameRsp(KVData *kvdata);
 public:
 	int m_UID;
 	string m_UName;
 	int m_SelectRoomIndex;
+	int m_SelectTableIndex;
 
 	vector<RoomInfo> m_RoomList;
 
 	afx_msg void OnBnClickedLoad();
 	afx_msg void OnStaticListClick();
+	afx_msg void OnStaticRoomClick();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnNMDblclkRoomlist(NMHDR *pNMHDR, LRESULT *pResult);
+	afx_msg void OnNMDblclkTablelist(NMHDR *pNMHDR, LRESULT *pResult);
 };

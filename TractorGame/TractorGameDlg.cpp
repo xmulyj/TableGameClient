@@ -73,8 +73,10 @@ BEGIN_MESSAGE_MAP(CTractorGameDlg, CDialog)
 	//}}AFX_MSG_MAP
 	ON_BN_CLICKED(IDC_LOAD, &CTractorGameDlg::OnBnClickedLoad)
 	ON_BN_CLICKED(IDC_STATIC_LIST, &CTractorGameDlg::OnStaticListClick)
+	ON_BN_CLICKED(IDC_STATIC_ROOM, &CTractorGameDlg::OnStaticRoomClick)
 	ON_WM_TIMER()
 	ON_NOTIFY(NM_DBLCLK, IDC_RoomList, &CTractorGameDlg::OnNMDblclkRoomlist)
+	ON_NOTIFY(NM_DBLCLK, IDC_TableList, &CTractorGameDlg::OnNMDblclkTablelist)
 END_MESSAGE_MAP()
 
 
@@ -112,6 +114,7 @@ BOOL CTractorGameDlg::OnInitDialog()
 	// TODO: 在此添加额外的初始化代码
 	m_UID = -1;
 	m_SelectRoomIndex = -1;
+	m_SelectTableIndex = -1;
 
 	//桌子列表
 	m_TableListCtrl.SetExtendedStyle(LVS_EX_FULLROWSELECT |LVS_EX_FLATSB |LVS_EX_GRIDLINES );
@@ -578,6 +581,8 @@ void CTractorGameDlg::OnRoomRsp()
 	recv_kvdata->GetValue(KEY_Protocol, Protocol);
 	if(Protocol == GetRoomInfoRsp)
 		OnGetRoomInfoRsp(recv_kvdata);
+	if(Protocol == AddGameRsp)
+		OnAddGameRsp(recv_kvdata);
 	else
 		assert(0);
 	factory.DeleteProtocol(-1, context.protocol);
@@ -633,6 +638,93 @@ bool CTractorGameDlg::OnGetRoomInfoRsp(KVData *kvdata)
 	return true;
 }
 
+
+void CTractorGameDlg::OnAddGame()
+{
+	if(m_CurStatus != Status_Playing)
+		return ;
+	if(!m_RoomSocket.IsConnected)
+	{
+		m_CurStatus = Status_PrintTableList;
+		PrintTableList();
+		return;
+	}
+
+	//TODO:画图
+	//
+	assert(m_SelectRoomIndex>=0 && m_SelectRoomIndex<m_RoomList.size());
+	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
+
+	//Send AddGame request
+	KVData kvdata(true);
+	kvdata.SetValue(KEY_Protocol, AddGame);
+	kvdata.SetValue(KEY_RoomID, room_info.RoomID);
+	kvdata.SetValue(KEY_TableID, m_SelectTableIndex);
+	kvdata.SetValue(KEY_ClientID, m_UID);
+	kvdata.SetValue(KEY_ClientName, m_UName);
+
+	KVDataProtocolFactory factory;
+	unsigned int header_size = factory.HeaderSize();
+	unsigned int body_size = kvdata.Size();
+	ProtocolContext *context = new ProtocolContext(header_size+body_size);
+
+	kvdata.Serialize(context.Buffer+header_size);
+	context.Size = header_size+body_size;
+	factory.EncodeHeader(context.Buffer, body_size);
+	
+	m_RoomSocket.m_SendContext = context;
+	m_RoomSocket.AsyncSelect(FD_WRITE|FD_READ|FD_CLOSE);
+
+	CString temp;
+	temp.Format(_T("send AddGame request\r\n"));
+	AppendMsg(temp);
+}
+
+void CTractorGameDlg::OnAddGameRsp(KVData *kvdata)
+{
+	if(m_CurStatus != Status_Playing)
+		return ;
+
+	string WelcomeMsg;
+	int    PlayerNum;
+	int    ClientNum;
+	vector<PlayerStatus> ClientStatus;
+	vector<PlayerStatus> AudienceStatus;
+	int    AudienceNum;
+	char   *NumArray;
+	int    Status;
+
+	kvdata->GetValue(KEY_WelcomeMsg, WelcomeMsg);
+	kvdata->GetValue(KEY_PlayerNum, PlayerNum);
+	kvdata->GetValue(KEY_ClientNum, ClientNum);
+	kvdata->GetValue(KEY_AudienceNum, AudienceNum);
+	unsigned int size=0;
+	kvdata->GetValue(KEY_NumArray, NumArray, size);
+	assert(size == sizeof(int)*2*(ClientNum+AudienceNum));
+
+	int *temp_buf = (int*)NumArray, i=0;
+	for(i=0; i<ClientNum; ++i)
+	{
+		PlayerStatus player_status;
+		player_status.client_id = ntohl(*temp_buf++);
+		player_status.status = ntohl(*temp_buf++);
+		ClientStatus.push_back(player_status);
+		if(player_status.client_id == m_UID)
+			Status = player_status.status;
+	}
+	for(int i=0; i<AudienceNum; ++i)
+	{
+		PlayerStatus player_status;
+		player_status.client_id = ntohl(*temp_buf++);
+		player_status.status = ntohl(*temp_buf++);
+		AudienceStatus.push_back(player_status);
+		if(player_status.client_id == m_UID)
+			Status = player_status.status;
+	}
+
+	//TODO:绘图
+}
+
 void CTractorGameDlg::OnBnClickedLoad()
 {
 	// TODO: 在此添加控件通知处理程序代码
@@ -671,9 +763,26 @@ void CTractorGameDlg::OnStaticListClick()
 		m_TableListCtrl.ShowWindow(SW_HIDE);
 		GetDlgItem(IDC_STATIC_ROOM)->ShowWindow(SW_HIDE);
 		m_RoomListCtrl.ShowWindow(SW_NORMAL);
-	
+
 		m_CurStatus = Status_PrintRoomList;
 		PrintRoomList();
+	}
+}
+
+void CTractorGameDlg::OnStaticRoomClick()
+{
+	if(m_CurStatus == Status_Playing)
+	{
+		GetDlgItem(IDC_STATIC_TABLE)->ShowWindow(SW_HIDE);
+
+		CString temp;
+
+		temp.Format(_T("->房间[%02d] %d 人"), m_SelectRoomIndex+1, m_RoomList[m_SelectRoomIndex].ClientNum);
+		GetDlgItem(IDC_STATIC_ROOM)->ShowWindow(SW_NORMAL);
+		m_TableListCtrl.ShowWindow(SW_NORMAL);
+
+		m_CurStatus = Status_PrintTableList;
+		PrintTableList();
 	}
 }
 
@@ -718,6 +827,37 @@ void CTractorGameDlg::OnNMDblclkRoomlist(NMHDR *pNMHDR, LRESULT *pResult)
 
 		AppendMsg(_T("OnDBClick\r\n"));
 		PrintTableList();
+	}
+
+	*pResult = 0;
+}
+
+void CTractorGameDlg::OnNMDblclkTablelist(NMHDR *pNMHDR, LRESULT *pResult)
+{
+	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
+	// TODO: 在此添加控件通知处理程序代码
+	int index = pNMItemActivate->iItem;
+	if(index >=0 && index<m_TableListCtrl.GetItemCount())
+	{
+		CString temp;
+		temp.Format(_T("Into Table[%d]\r\n"), index);
+		AppendMsg(temp);
+
+		KillTimer(2);
+		m_SelectTableIndex = index;
+		m_TableListCtrl.ShowWindow(SW_HIDE);
+
+		temp.Format(_T("->房间[%02d]"), m_SelectRoomIndex+1);
+		GetDlgItem(IDC_STATIC_ROOM)->SetWindowText(temp);
+		GetDlgItem(IDC_STATIC_ROOM)->ShowWindow(SW_NORMAL);
+		temp.Format(_T("->桌子[%02d]"), m_SelectTableIndex+1);
+		GetDlgItem(IDC_STATIC_TABLE)->SetWindowText(temp);
+		GetDlgItem(IDC_STATIC_TABLE)->ShowWindow(SW_NORMAL);
+		m_TableListCtrl.ShowWindow(SW_HIDE);
+
+		m_CurStatus = Status_Playing;
+		
+		OnAddGame();
 	}
 
 	*pResult = 0;
