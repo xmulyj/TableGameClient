@@ -139,10 +139,6 @@ BOOL CTractorGameDlg::OnInitDialog()
 	m_RoomListCtrl.GetWindowRect(&m_TableRect);
 	ScreenToClient(&m_TableRect);
 
-	//GetClientRect(&m_TableRect);
-	//m_TableRect.top += 70;
-	//m_TableRect.bottom -= 220;
-
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -805,21 +801,26 @@ void CTractorGameDlg::OnNMDblclkTablelist(NMHDR *pNMHDR, LRESULT *pResult)
 
 void CTractorGameDlg::OnPaint_TableList(CRect &rect)
 {
-	const int HIGHT = 100;
+	const int HEIGHT = 100;
 	const int WIDTH = 100;
+	const int PADDING = 40;
+	const int VSCROLL_WIDTH = 16;
+	
+	int x_offer =((rect.right-rect.left-VSCROLL_WIDTH)-(6*WIDTH+5*PADDING))/2;
+	int bottom = 0;
+
 	CRect draw_rect = rect;
+	draw_rect.left += x_offer;
 	draw_rect.right = draw_rect.left+WIDTH;
-	draw_rect.bottom = draw_rect.top+HIGHT;
+	draw_rect.bottom = draw_rect.top+HEIGHT;
 
 	CPaintDC dc(this);
-
 	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
-	
 	for(int i=0; i<room_info.TableArray.size(); ++i)
 	{
+		bottom = draw_rect.bottom;
 		CRect table_rect, player_rect;
-
-		dc.SelectObject(GetStockObject(LTGRAY_BRUSH)); 
+		CBrush *old_brush = (CBrush *)dc.SelectObject(GetStockObject(LTGRAY_BRUSH)); 
 		dc.Rectangle(&draw_rect);
 		dc.SelectObject(GetStockObject(WHITE_BRUSH)); 
 
@@ -865,20 +866,43 @@ void CTractorGameDlg::OnPaint_TableList(CRect &rect)
 			player_rect.bottom = y+10;
 
 			dc.Ellipse(&player_rect);
+			dc.SelectObject(old_brush);
 		}
 
 		if((i+1) % 6 == 0)
 		{
-			draw_rect.left = rect.left;
-			draw_rect.right = rect.left+WIDTH;
+			draw_rect.left = rect.left+x_offer;
+			draw_rect.right = draw_rect.left+WIDTH;
 
-			draw_rect.top = draw_rect.bottom+40;
-			draw_rect.bottom = draw_rect.top+HIGHT;
+			draw_rect.top = draw_rect.bottom+PADDING;
+			draw_rect.bottom = draw_rect.top+HEIGHT;
 		}
 		else
 		{
-			draw_rect.left = draw_rect.right+40;
+			draw_rect.left = draw_rect.right+PADDING;
 			draw_rect.right = draw_rect.left+WIDTH;
 		}
 	}
+
+	//画滚动条
+	draw_rect.left = rect.right-VSCROLL_WIDTH;
+	draw_rect.right = rect.right;
+	draw_rect.top = rect.top;
+	draw_rect.bottom = rect.bottom;
+
+	CPen pen(PS_SOLID, 1, RGB(200,200,200));
+	CPen *old_pen = dc.SelectObject(&pen);
+	dc.Rectangle(&draw_rect);
+
+	if(bottom-rect.top > rect.Height())
+	{
+		int vscroll_height = rect.Height()*rect.Height()/(bottom-rect.top);
+		draw_rect.bottom = draw_rect.top+vscroll_height;
+		draw_rect.left++;
+		draw_rect.right--;
+		CPen pen(PS_SOLID, 2, RGB(100,100,100));
+		dc.SelectObject(&pen);
+		dc.Rectangle(&draw_rect);
+	}
+	dc.SelectObject(old_pen);
 }
