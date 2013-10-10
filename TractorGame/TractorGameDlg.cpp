@@ -17,6 +17,13 @@ using namespace easynet;
 
 #define INTERFACE_IP  _T("192.168.80.130")
 
+#define TABLE_NUM             6       //一行显示桌子数
+#define HEIGHT                      100  //桌子高
+#define WIDTH                       100  //桌子宽
+#define PADDING                   40    //桌子间隔
+#define VSCROLL_WIDTH   16   //滚动条宽
+
+
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
 
 class CAboutDlg : public CDialog
@@ -77,6 +84,10 @@ BEGIN_MESSAGE_MAP(CTractorGameDlg, CDialog)
 	ON_WM_TIMER()
 	ON_NOTIFY(NM_DBLCLK, IDC_RoomList, &CTractorGameDlg::OnNMDblclkRoomlist)
 	ON_NOTIFY(NM_DBLCLK, IDC_TableList, &CTractorGameDlg::OnNMDblclkTablelist)
+	ON_WM_LBUTTONDOWN()
+	ON_WM_LBUTTONUP()
+	ON_WM_MOUSEMOVE()
+	ON_WM_LBUTTONDBLCLK()
 END_MESSAGE_MAP()
 
 
@@ -136,6 +147,11 @@ BOOL CTractorGameDlg::OnInitDialog()
 
 	m_CurStatus = Status_PrintRoomList;
 
+	//绘图
+	m_VScrollBarHeight = 0;
+	m_TableRectYOffset = 0;
+	m_TableRectXOffset = 0;
+	m_LButtonDown = FALSE;
 	m_RoomListCtrl.GetWindowRect(&m_TableRect);
 	ScreenToClient(&m_TableRect);
 
@@ -183,10 +199,11 @@ void CTractorGameDlg::OnPaint()
 		if(m_CurStatus == Status_PrintTableList)
 		{
 			OnPaint_TableList(m_TableRect);
-		}		
-
-
-		CDialog::OnPaint();
+		}
+		else if(m_CurStatus == Status_Playing)
+			OnPaint_Talbe(m_TableRect);
+		else
+			CDialog::OnPaint();
 	}
 }
 
@@ -583,11 +600,8 @@ void CTractorGameDlg::OnAddGameRsp(KVData *kvdata)
 	string WelcomeMsg;
 	int    PlayerNum;
 	int    ClientNum;
-	vector<PlayerStatus> ClientStatus;
-	vector<PlayerStatus> AudienceStatus;
 	int    AudienceNum;
 	char   *NumArray;
-	int    Status;
 
 	kvdata->GetValue(KEY_WelcomeMsg, WelcomeMsg);
 	kvdata->GetValue(KEY_PlayerNum, PlayerNum);
@@ -598,26 +612,29 @@ void CTractorGameDlg::OnAddGameRsp(KVData *kvdata)
 	assert(size == sizeof(int)*2*(ClientNum+AudienceNum));
 
 	int *temp_buf = (int*)NumArray, i=0;
+
+	m_PlayerStatus.clear();
+	m_AudienceStatus.clear();
 	for(i=0; i<ClientNum; ++i)
 	{
-		PlayerStatus player_status;
+		TableStatus player_status;
 		player_status.client_id = ntohl(*temp_buf++);
 		player_status.status = ntohl(*temp_buf++);
-		ClientStatus.push_back(player_status);
+		m_PlayerStatus.push_back(player_status);
 		if(player_status.client_id == m_UID)
-			Status = player_status.status;
+			m_MyStatus = player_status.status;
 	}
 	for(int i=0; i<AudienceNum; ++i)
 	{
-		PlayerStatus player_status;
-		player_status.client_id = ntohl(*temp_buf++);
-		player_status.status = ntohl(*temp_buf++);
-		AudienceStatus.push_back(player_status);
-		if(player_status.client_id == m_UID)
-			Status = player_status.status;
+		TableStatus audience_status;
+		audience_status.client_id = ntohl(*temp_buf++);
+		audience_status.status = ntohl(*temp_buf++);
+		m_AudienceStatus.push_back(audience_status);
+		if(audience_status.client_id == m_UID)
+			m_MyStatus = audience_status.status;
 	}
 
-	//TODO:绘图
+	InvalidateRect(&m_TableRect);
 }
 
 void CTractorGameDlg::QuitGameReq()
@@ -799,28 +816,66 @@ void CTractorGameDlg::OnNMDblclkTablelist(NMHDR *pNMHDR, LRESULT *pResult)
 }
 
 
-void CTractorGameDlg::OnPaint_TableList(CRect &rect)
+void CTractorGameDlg::OnPaint_TableList(CRect &client_rect)
 {
-	const int HEIGHT = 100;
-	const int WIDTH = 100;
-	const int PADDING = 40;
-	const int VSCROLL_WIDTH = 16;
-	
-	int x_offer =((rect.right-rect.left-VSCROLL_WIDTH)-(6*WIDTH+5*PADDING))/2;
-	int bottom = 0;
+	CPaintDC dc(this);
+	CPen *old_pen;
+	CRect rect, draw_rect;
 
-	CRect draw_rect = rect;
-	draw_rect.left += x_offer;
+	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
+
+	//画外框
+	dc.Rectangle(&client_rect);
+
+	rect.left = client_rect.left+2;
+	rect.right = client_rect.right-2;
+	rect.top = client_rect.top+2;
+	rect.bottom = client_rect.bottom-2;
+	
+	//画滚动条外框
+	draw_rect.left = rect.right-VSCROLL_WIDTH;
+	draw_rect.right = rect.right;
+	draw_rect.top = rect.top;
+	draw_rect.bottom = rect.bottom;
+	CPen pen(PS_SOLID, 1, RGB(200,200,200));
+	old_pen = dc.SelectObject(&pen);
+	dc.Rectangle(&draw_rect);
+
+	//画滚动条
+	int RowNum = room_info.TableArray.size()/TABLE_NUM+(room_info.TableArray.size()%TABLE_NUM>0?1:0);  //行数
+	int ViewHeight = RowNum*HEIGHT+(RowNum-1)*PADDING;  //总的高度
+	if(ViewHeight > rect.Height())  //有滚动条
+	{
+		  //滚动条高度
+		m_VScrollBarHeight = rect.Height()*rect.Height()/(ViewHeight);
+		//滚动条位置
+		draw_rect.top += m_TableRectYOffset;
+		draw_rect.bottom = draw_rect.top+m_VScrollBarHeight;
+		draw_rect.left++;
+		draw_rect.right--;
+		CPen pen(PS_SOLID, 2, RGB(100,100,100));
+		dc.SelectObject(&pen);
+		dc.Rectangle(&draw_rect);
+	}
+	dc.SelectObject(old_pen);
+
+	//画桌子
+	m_TableRectXOffset = ((rect.right-rect.left-VSCROLL_WIDTH)-(TABLE_NUM*WIDTH+(TABLE_NUM-1)*PADDING))/2;
+	int y_offset = -1*(ViewHeight*m_TableRectYOffset/rect.Height());  //视图Y轴偏远位置
+	
+	draw_rect = rect;
+	draw_rect.left += m_TableRectXOffset;
 	draw_rect.right = draw_rect.left+WIDTH;
+	draw_rect.top = rect.top+y_offset;
 	draw_rect.bottom = draw_rect.top+HEIGHT;
 
-	CPaintDC dc(this);
-	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
+	//画桌子
 	for(int i=0; i<room_info.TableArray.size(); ++i)
 	{
-		bottom = draw_rect.bottom;
 		CRect table_rect, player_rect;
-		CBrush *old_brush = (CBrush *)dc.SelectObject(GetStockObject(LTGRAY_BRUSH)); 
+
+		CBrush brush(RGB(225,225, 225));
+		CBrush *old_brush = (CBrush *)dc.SelectObject(&brush); 
 		dc.Rectangle(&draw_rect);
 		dc.SelectObject(GetStockObject(WHITE_BRUSH)); 
 
@@ -830,6 +885,9 @@ void CTractorGameDlg::OnPaint_TableList(CRect &rect)
 		table_rect.top = draw_rect.top+25;
 		table_rect.bottom = table_rect.top+50;
 		dc.Rectangle(&table_rect);
+		CString lable;
+		lable.Format(_T("%d"), i+1);
+		dc.TextOut((draw_rect.left+draw_rect.right)/2,(draw_rect.top+draw_rect.bottom)/2, lable, lable.GetLength());
 
 		int PlayerArray = room_info.TableArray[i];
 
@@ -869,9 +927,9 @@ void CTractorGameDlg::OnPaint_TableList(CRect &rect)
 			dc.SelectObject(old_brush);
 		}
 
-		if((i+1) % 6 == 0)
+		if((i+1) % TABLE_NUM == 0)
 		{
-			draw_rect.left = rect.left+x_offer;
+			draw_rect.left = rect.left+m_TableRectXOffset;
 			draw_rect.right = draw_rect.left+WIDTH;
 
 			draw_rect.top = draw_rect.bottom+PADDING;
@@ -883,26 +941,208 @@ void CTractorGameDlg::OnPaint_TableList(CRect &rect)
 			draw_rect.right = draw_rect.left+WIDTH;
 		}
 	}
+}
 
-	//画滚动条
-	draw_rect.left = rect.right-VSCROLL_WIDTH;
-	draw_rect.right = rect.right;
-	draw_rect.top = rect.top;
-	draw_rect.bottom = rect.bottom;
 
-	CPen pen(PS_SOLID, 1, RGB(200,200,200));
-	CPen *old_pen = dc.SelectObject(&pen);
-	dc.Rectangle(&draw_rect);
+void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
+{
+	CPaintDC dc(this);
+	CRect rect, draw_rect;
 
-	if(bottom-rect.top > rect.Height())
+	//画外框
+	dc.Rectangle(&client_rect);
+	//画分割线
+	rect = client_rect;
+	rect.left = rect.right-100;
+	dc.MoveTo(rect.left, rect.top);
+	dc.LineTo(rect.left, rect.bottom);
+
+	//画玩家
+	rect.right = rect.left-2;
+	rect.left = client_rect.left+2;
+	rect.top += 2;
+	rect.bottom -= 2;
+	dc.Rectangle(&rect);
+
+	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
+	int i, index = -1;
+	for(i=0; i<m_PlayerStatus.size(); ++i)
 	{
-		int vscroll_height = rect.Height()*rect.Height()/(bottom-rect.top);
-		draw_rect.bottom = draw_rect.top+vscroll_height;
-		draw_rect.left++;
-		draw_rect.right--;
-		CPen pen(PS_SOLID, 2, RGB(100,100,100));
-		dc.SelectObject(&pen);
-		dc.Rectangle(&draw_rect);
+		if(m_PlayerStatus[i].client_id == m_UID)
+		{
+			index = i;   //自己在桌子中的位置
+			break;
+		}
 	}
-	dc.SelectObject(old_pen);
+	int delta = 0;
+	if(index != -1)
+		delta = (room_info.PlayerNum-1)-index;   // 玩家自己的位置顺时针移动的个数,以便显示在下面的位置
+	int x, y;
+	for(i=0; i<m_PlayerStatus.size(); ++i)
+	{
+		int pos = (i+delta)%room_info.PlayerNum;
+		if(pos == 0)
+		{
+			x = rect.left+20;
+			y = (rect.bottom-rect.top)/2;
+		}
+		else if(pos == 1)
+		{
+			x = (rect.left+rect.right)/2;
+			y = rect.top+20;
+		}
+		else if(pos == 2)
+		{
+			x = rect.right-20;
+			y = (rect.bottom-rect.top)/2;
+		}
+		else if(pos == 3)
+		{
+			x = (rect.left+rect.right)/2;
+			y = rect.bottom-20;
+		}
+
+		draw_rect.left = x-20;
+		draw_rect.right = x+20;
+		draw_rect.top = y-20;
+		draw_rect.bottom = y+20;
+
+		if(pos==3 && m_MyStatus>1)  //自己是玩家
+		{
+			dc.SelectObject(GetStockObject(GRAY_BRUSH));
+			dc.Ellipse(&draw_rect);
+			dc.SelectObject(GetStockObject(WHITE_BRUSH));
+		}
+		else
+			dc.Ellipse(&draw_rect);
+
+		if(pos == 0)
+			x += 25;
+		else if(pos == 1)
+			y += 25;
+		else if(pos == 2)
+			x -= 50;
+		else if(pos == 3)
+			y -= 40;
+		CString lable;
+		lable.Format(_T("id:%d"), m_PlayerStatus[i].client_id);
+		if(pos == 3)
+		{
+			COLORREF old_color = dc.GetTextColor();
+			dc.SetTextColor(RGB(255, 0, 0));
+			dc.TextOut(x, y, lable, lable.GetLength());
+			dc.SetTextColor(old_color);
+		}
+		else
+			dc.TextOut(x, y, lable, lable.GetLength());
+	}
+
+	//画旁观者
+	rect = client_rect;
+	rect.left = rect.right-98;
+	rect.right -=2;
+	rect.top += 2;
+	rect.bottom -= 2;
+	dc.Rectangle(&rect);
+
+	x = rect.left+2;
+	y = rect.top+2;
+	for(int i=0; i<m_AudienceStatus.size(); ++i)
+	{
+		CString lable;
+		lable.Format(_T("%d"), m_AudienceStatus[i].client_id);
+		if(m_AudienceStatus[i].client_id == m_UID)
+		{
+			COLORREF old_color = dc.GetTextColor();
+			dc.SetTextColor(RGB(255, 0, 0));
+			dc.TextOut(x, y, lable, lable.GetLength());
+			dc.SetTextColor(old_color);
+		}
+		else
+			dc.TextOut(x, y, lable, lable.GetLength());
+	}
+}
+
+void CTractorGameDlg::OnLButtonDown(UINT nFlags, CPoint point)
+{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+	if(m_CurStatus == Status_PrintTableList)
+	{
+		if(point.x>=m_TableRect.left&&point.x<m_TableRect.right
+			&&point.y>=m_TableRect.top&&point.y<m_TableRect.bottom)
+			m_LButtonDown = TRUE;
+		m_PreMousePoint = point;
+	}
+	//CDialog::OnLButtonDown(nFlags, point);
+}
+
+void CTractorGameDlg::OnLButtonUp(UINT nFlags, CPoint point)
+{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+	m_LButtonDown = FALSE;
+	CDialog::OnLButtonUp(nFlags, point);
+}
+
+void CTractorGameDlg::OnMouseMove(UINT nFlags, CPoint point)
+{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+	if(m_LButtonDown == TRUE)
+	{
+		if(m_VScrollBarHeight > 0)  //有滚动条
+		{
+			int y_offset = m_TableRectYOffset+point.y-m_PreMousePoint.y;
+			if(y_offset >= 0 && y_offset+m_VScrollBarHeight<m_TableRect.Height()-1)
+			{
+				m_TableRectYOffset = y_offset;
+				m_PreMousePoint = point;
+				InvalidateRect(&m_TableRect);
+			}
+		}
+	}
+	CDialog::OnMouseMove(nFlags, point);
+}
+
+void CTractorGameDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
+{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+	if(m_CurStatus == Status_PrintTableList)
+	{
+		if(point.x>=m_TableRect.left&&point.x<m_TableRect.right
+			&&point.y>=m_TableRect.top&&point.y<m_TableRect.bottom)
+		{
+			//转换点在table中的逻辑坐标
+			int y = point.y-m_TableRect.top+m_TableRectYOffset;
+			int x =  point.x-m_TableRect.left-m_TableRectXOffset;
+
+			int row = y/(HEIGHT+PADDING) + (y%(HEIGHT+PADDING)>0?1:0);
+			int column = x/(WIDTH+PADDING) + (x%(WIDTH+PADDING)>0?1:0);
+
+			if(y<row*(HEIGHT+PADDING) -PADDING && x<column*(WIDTH+PADDING) -PADDING)   //点中的是桌子(而不是间隔)
+			{
+				m_CurStatus = Status_Playing;
+				m_SelectTableIndex = (row-1)*TABLE_NUM+(column-1);
+
+				CString temp;
+				temp.Format(_T("Into Table[%d]\r\n"), m_SelectTableIndex+1);
+				AppendMsg(temp);
+
+				//KillTimer(2);
+				m_TableListCtrl.ShowWindow(SW_HIDE);
+
+				temp.Format(_T("->房间[%02d]"), m_SelectRoomIndex+1);
+				GetDlgItem(IDC_STATIC_ROOM)->SetWindowText(temp);
+				GetDlgItem(IDC_STATIC_ROOM)->ShowWindow(SW_NORMAL);
+				temp.Format(_T("->桌子[%02d]"), m_SelectTableIndex+1);
+				GetDlgItem(IDC_STATIC_TABLE)->SetWindowText(temp);
+				GetDlgItem(IDC_STATIC_TABLE)->ShowWindow(SW_NORMAL);
+				m_TableListCtrl.ShowWindow(SW_HIDE);
+
+				InvalidateRect(&m_TableRect);
+				OnAddGame();
+			}
+			
+		}
+	}
+
+	CDialog::OnLButtonDblClk(nFlags, point);
 }
