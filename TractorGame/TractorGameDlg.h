@@ -22,7 +22,8 @@ typedef struct _room_info
 {
 	int         RoomID;
 	int         ClientNum;
-	string      IP;
+	int         PlayerNum;
+	string    IP;
 	int         Port;
 
 	vector<int> TableArray;  //每桌玩家数量
@@ -30,7 +31,7 @@ typedef struct _room_info
 
 typedef struct _player_status_
 {
-	int client_id;
+	int   client_id;
 	int	status;
 }PlayerStatus;
 
@@ -101,4 +102,7 @@ public:
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnNMDblclkRoomlist(NMHDR *pNMHDR, LRESULT *pResult);
 	afx_msg void OnNMDblclkTablelist(NMHDR *pNMHDR, LRESULT *pResult);
+public:
+	CRect m_TableRect;
+	void OnPaint_TableList(CRect &rect);
 };

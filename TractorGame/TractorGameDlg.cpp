@@ -136,6 +136,13 @@ BOOL CTractorGameDlg::OnInitDialog()
 
 	m_CurStatus = Status_PrintRoomList;
 
+	m_RoomListCtrl.GetWindowRect(&m_TableRect);
+	ScreenToClient(&m_TableRect);
+
+	//GetClientRect(&m_TableRect);
+	//m_TableRect.top += 70;
+	//m_TableRect.bottom -= 220;
+
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -177,6 +184,12 @@ void CTractorGameDlg::OnPaint()
 	}
 	else
 	{
+		if(m_CurStatus == Status_PrintTableList)
+		{
+			OnPaint_TableList(m_TableRect);
+		}		
+
+
 		CDialog::OnPaint();
 	}
 }
@@ -474,7 +487,6 @@ bool CTractorGameDlg::OnGetRoomInfoRsp(KVData *kvdata)
 {
 	int RoomID;
 	int TableNum;
-	int PlayerNum;
 	unsigned int size;
 	char *NumArray;
 
@@ -486,7 +498,7 @@ bool CTractorGameDlg::OnGetRoomInfoRsp(KVData *kvdata)
 
 	kvdata->GetValue(KEY_ClientNum, room_info.ClientNum);
 	kvdata->GetValue(KEY_TableNum, TableNum);
-	kvdata->GetValue(KEY_PlayerNum, PlayerNum);
+	kvdata->GetValue(KEY_PlayerNum, room_info.PlayerNum);
 	kvdata->GetValue(KEY_NumArray, NumArray, size);
 	assert(size == sizeof(int)*TableNum);
 	room_info.TableArray.clear();
@@ -509,13 +521,15 @@ bool CTractorGameDlg::OnGetRoomInfoRsp(KVData *kvdata)
 		{
 			int cur_num = 0;
 			int player_array = room_info.TableArray[i];
-			for(int j=0; j<PlayerNum; ++j)
+			for(int j=0; j<room_info.PlayerNum; ++j)
 				if(player_array & 1<<j)
 					++cur_num;
 			temp.Format(_T("桌子[%d] %d人"), i+1, cur_num);
 			m_TableListCtrl.InsertItem(i, temp, 0);
 		}
 		m_TableListCtrl.SetRedraw(TRUE);
+
+		InvalidateRect(m_TableRect);
 	}
 
 	//SetTimer(2, 2000, NULL);
@@ -737,7 +751,7 @@ void CTractorGameDlg::OnNMDblclkRoomlist(NMHDR *pNMHDR, LRESULT *pResult)
 	if(index >=0 && index<m_RoomListCtrl.GetItemCount())
 	{
 		CString temp;
-		temp.Format(_T("Into Room[%d]\r\n"), index);
+		temp.Format(_T("OnDBClick. Into Room[%d]\r\n"), index);
 		AppendMsg(temp);
 
 		KillTimer(1);
@@ -747,12 +761,10 @@ void CTractorGameDlg::OnNMDblclkRoomlist(NMHDR *pNMHDR, LRESULT *pResult)
 		temp.Format(_T("->房间[%02d]"), index+1);
 		GetDlgItem(IDC_STATIC_ROOM)->SetWindowText(temp);
 		GetDlgItem(IDC_STATIC_ROOM)->ShowWindow(SW_NORMAL);
-		m_TableListCtrl.ShowWindow(SW_NORMAL);
+		//m_TableListCtrl.ShowWindow(SW_NORMAL);
+
 		
-
 		m_CurStatus = Status_PrintTableList;
-
-		AppendMsg(_T("OnDBClick\r\n"));
 		PrintTableList();
 	}
 
@@ -788,4 +800,85 @@ void CTractorGameDlg::OnNMDblclkTablelist(NMHDR *pNMHDR, LRESULT *pResult)
 	}
 
 	*pResult = 0;
+}
+
+
+void CTractorGameDlg::OnPaint_TableList(CRect &rect)
+{
+	const int HIGHT = 100;
+	const int WIDTH = 100;
+	CRect draw_rect = rect;
+	draw_rect.right = draw_rect.left+WIDTH;
+	draw_rect.bottom = draw_rect.top+HIGHT;
+
+	CPaintDC dc(this);
+
+	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
+	
+	for(int i=0; i<room_info.TableArray.size(); ++i)
+	{
+		CRect table_rect, player_rect;
+
+		dc.SelectObject(GetStockObject(LTGRAY_BRUSH)); 
+		dc.Rectangle(&draw_rect);
+		dc.SelectObject(GetStockObject(WHITE_BRUSH)); 
+
+		//table
+		table_rect.left = draw_rect.left+25;
+		table_rect.right = table_rect.left+50;
+		table_rect.top = draw_rect.top+25;
+		table_rect.bottom = table_rect.top+50;
+		dc.Rectangle(&table_rect);
+
+		int PlayerArray = room_info.TableArray[i];
+
+		for(int j=0; j<room_info.PlayerNum; ++j)
+		{
+			if((PlayerArray & (1<<j)) == 0)
+				continue;
+
+			int x, y;
+			if(j==0)
+			{
+				x = (draw_rect.left+table_rect.left)/2;
+				y = (draw_rect.top+draw_rect.bottom)/2;
+			}
+			else if(j==1)
+			{
+				x = (draw_rect.left+draw_rect.right)/2;
+				y = (draw_rect.top+table_rect.top)/2;
+			}
+			else if(j==2)
+			{
+				x = (table_rect.right+draw_rect.right)/2;
+				y = (draw_rect.top+draw_rect.bottom)/2;
+			}
+			else
+			{
+				x = (draw_rect.left+draw_rect.right)/2;
+				y = (table_rect.bottom+draw_rect.bottom)/2;
+			}
+
+			player_rect.left = x-10;
+			player_rect.right = x+10;
+			player_rect.top = y-10;
+			player_rect.bottom = y+10;
+
+			dc.Ellipse(&player_rect);
+		}
+
+		if((i+1) % 6 == 0)
+		{
+			draw_rect.left = rect.left;
+			draw_rect.right = rect.left+WIDTH;
+
+			draw_rect.top = draw_rect.bottom+40;
+			draw_rect.bottom = draw_rect.top+HIGHT;
+		}
+		else
+		{
+			draw_rect.left = draw_rect.right+40;
+			draw_rect.right = draw_rect.left+WIDTH;
+		}
+	}
 }
