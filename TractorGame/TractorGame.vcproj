@@ -190,10 +190,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\RoomSocket.cpp"
-				>
-			</File>
-			<File
 				RelativePath=".\stdafx.cpp"
 				>
 				<FileConfiguration
@@ -237,10 +233,6 @@
 			</File>
 			<File
 				RelativePath=".\Resource.h"
-				>
-			</File>
-			<File
-				RelativePath=".\RoomSocket.h"
 				>
 			</File>
 			<File

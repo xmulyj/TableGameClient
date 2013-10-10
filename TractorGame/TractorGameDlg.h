@@ -6,7 +6,6 @@
 #include "afxcmn.h"
 
 #include "GameSocket.h"
-#include "RoomSocket.h"
 
 #include <string>
 #include <vector>
@@ -63,16 +62,17 @@ public:
 	void AppendMsg(LPCTSTR msg);
 public:
 	CListCtrl m_RoomListCtrl;
+	CImageList m_ImageList;
+
 	CListCtrl m_TableListCtrl;
 
-	CGameSocket m_GameSocket;
+	CInterfaceSocket m_InterfaceSocket;
 	CRoomSocket m_RoomSocket;
 
 	ClientStatus m_CurStatus;
 	
 	//显示房间列表
 	void PrintRoomList();
-	bool OnInterfaceRsp();
 	bool GetAllRoomReq();
 	bool OnGetAllRoomRsp(KVData *kvdata);
 	bool GetRoomAddrReq();
@@ -80,13 +80,13 @@ public:
 
 	//显示桌子列表
 	void PrintTableList();
-	void OnRoomRsp();
 	bool GetRoomInfoReq();
 	bool OnGetRoomInfoRsp(KVData *kvdata);
 	
 	//开始玩游戏
 	void OnAddGame();
 	void OnAddGameRsp(KVData *kvdata);
+	void QuitGameReq();
 public:
 	int m_UID;
 	string m_UName;
