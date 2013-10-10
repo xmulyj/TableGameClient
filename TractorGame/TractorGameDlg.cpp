@@ -984,7 +984,7 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 		if(pos == 0)
 		{
 			x = rect.left+20;
-			y = (rect.bottom-rect.top)/2;
+			y = (rect.bottom+rect.top)/2;
 		}
 		else if(pos == 1)
 		{
@@ -994,7 +994,7 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 		else if(pos == 2)
 		{
 			x = rect.right-20;
-			y = (rect.bottom-rect.top)/2;
+			y = (rect.bottom+rect.top)/2;
 		}
 		else if(pos == 3)
 		{
@@ -1026,7 +1026,7 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 			y -= 40;
 		CString lable;
 		lable.Format(_T("id:%d"), m_PlayerStatus[i].client_id);
-		if(pos == 3)
+		if(pos==3 && m_MyStatus>1)
 		{
 			COLORREF old_color = dc.GetTextColor();
 			dc.SetTextColor(RGB(255, 0, 0));
