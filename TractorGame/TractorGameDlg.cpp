@@ -978,6 +978,9 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 	if(index != -1)
 		delta = (room_info.PlayerNum-1)-index;   // 玩家自己的位置顺时针移动的个数,以便显示在下面的位置
 	int x, y;
+
+	CString StatusStr[4]={_T("UnKnow"),_T("Audience"),_T("Wait"), _T("Playing")};
+
 	for(i=0; i<m_PlayerStatus.size(); ++i)
 	{
 		int pos = (i+delta)%room_info.PlayerNum;
@@ -1025,7 +1028,9 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 		else if(pos == 3)
 			y -= 40;
 		CString lable;
-		lable.Format(_T("id:%d"), m_PlayerStatus[i].client_id);
+
+		lable.Format(_T("id:%d "), m_PlayerStatus[i].client_id);
+		lable += StatusStr[m_PlayerStatus[i].status];
 		if(pos==3 && m_MyStatus>1)
 		{
 			COLORREF old_color = dc.GetTextColor();
