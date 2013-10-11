@@ -149,12 +149,14 @@ BOOL CTractorGameDlg::OnInitDialog()
 
 	//绘图
 	m_VScrollBarHeight = 0;
-	m_TableRectYOffset = 0;
+	m_VScrollBarYOffset = 0;
 	m_TableRectXOffset = 0;
 	m_LButtonDown = FALSE;
 	m_RoomListCtrl.GetWindowRect(&m_TableRect);
 	ScreenToClient(&m_TableRect);
 
+	if(m_Bitmap.LoadBitmap(IDB_BITMAP1) == TRUE)
+		AppendMsg(_T("load bitmap succ\r\n"));
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -825,31 +827,34 @@ void CTractorGameDlg::OnPaint_TableList(CRect &client_rect)
 	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
 
 	//画外框
+	CBrush gb_brush(&m_Bitmap);
+	CBrush *old_brush = dc.SelectObject(&gb_brush);
 	dc.Rectangle(&client_rect);
+	dc.SelectObject(old_brush);
 
-	rect.left = client_rect.left+2;
-	rect.right = client_rect.right-2;
-	rect.top = client_rect.top+2;
-	rect.bottom = client_rect.bottom-2;
-	
 	//画滚动条外框
-	draw_rect.left = rect.right-VSCROLL_WIDTH;
-	draw_rect.right = rect.right;
-	draw_rect.top = rect.top;
-	draw_rect.bottom = rect.bottom;
+	draw_rect.left = client_rect.right-VSCROLL_WIDTH;
+	draw_rect.right = client_rect.right;
+	draw_rect.top = client_rect.top;
+	draw_rect.bottom = client_rect.bottom;
 	CPen pen(PS_SOLID, 1, RGB(200,200,200));
 	old_pen = dc.SelectObject(&pen);
 	dc.Rectangle(&draw_rect);
+
+	rect.left = client_rect.left+2;
+	rect.right = client_rect.right-VSCROLL_WIDTH-2;
+	rect.top = client_rect.top+2;
+	rect.bottom = client_rect.bottom-2;
 
 	//画滚动条
 	int RowNum = room_info.TableArray.size()/TABLE_NUM+(room_info.TableArray.size()%TABLE_NUM>0?1:0);  //行数
 	int ViewHeight = RowNum*HEIGHT+(RowNum-1)*PADDING;  //总的高度
 	if(ViewHeight > rect.Height())  //有滚动条
 	{
-		  //滚动条高度
-		m_VScrollBarHeight = rect.Height()*rect.Height()/(ViewHeight);
+		//滚动条高度
+		m_VScrollBarHeight = client_rect.Height()*rect.Height()/(ViewHeight);
 		//滚动条位置
-		draw_rect.top += m_TableRectYOffset;
+		draw_rect.top += m_VScrollBarYOffset;
 		draw_rect.bottom = draw_rect.top+m_VScrollBarHeight;
 		draw_rect.left++;
 		draw_rect.right--;
@@ -860,9 +865,9 @@ void CTractorGameDlg::OnPaint_TableList(CRect &client_rect)
 	dc.SelectObject(old_pen);
 
 	//画桌子
-	m_TableRectXOffset = ((rect.right-rect.left-VSCROLL_WIDTH)-(TABLE_NUM*WIDTH+(TABLE_NUM-1)*PADDING))/2;
-	int y_offset = -1*(ViewHeight*m_TableRectYOffset/rect.Height());  //视图Y轴偏远位置
-	
+	m_TableRectXOffset = (rect.Width()-(TABLE_NUM*WIDTH+(TABLE_NUM-1)*PADDING))/2;
+	int y_offset = -1*(ViewHeight*m_VScrollBarYOffset/client_rect.Height());  //视图Y轴偏远位置
+
 	draw_rect = rect;
 	draw_rect.left += m_TableRectXOffset;
 	draw_rect.right = draw_rect.left+WIDTH;
@@ -1095,11 +1100,11 @@ void CTractorGameDlg::OnMouseMove(UINT nFlags, CPoint point)
 	{
 		if(m_VScrollBarHeight > 0)  //有滚动条
 		{
-			int y_offset = m_TableRectYOffset+point.y-m_PreMousePoint.y;
-			if(y_offset >= 0 && y_offset+m_VScrollBarHeight<m_TableRect.Height()-1)
+			int y_offset = m_VScrollBarYOffset+point.y-m_PreMousePoint.y;
+			m_PreMousePoint = point;
+			if(y_offset >= 0 && y_offset+m_VScrollBarHeight<=m_TableRect.Height())
 			{
-				m_TableRectYOffset = y_offset;
-				m_PreMousePoint = point;
+				m_VScrollBarYOffset = y_offset;				
 				InvalidateRect(&m_TableRect);
 			}
 		}
@@ -1112,12 +1117,13 @@ void CTractorGameDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
 	// TODO: 在此添加消息处理程序代码和/或调用默认值
 	if(m_CurStatus == Status_PrintTableList)
 	{
-		if(point.x>=m_TableRect.left&&point.x<m_TableRect.right
-			&&point.y>=m_TableRect.top&&point.y<m_TableRect.bottom)
+		if(point.x>=m_TableRect.left+2&&point.x<m_TableRect.right-VSCROLL_WIDTH-2
+			&&point.y>=m_TableRect.top+2&&point.y<m_TableRect.bottom-2)
 		{
 			//转换点在table中的逻辑坐标
-			int y = point.y-m_TableRect.top+m_TableRectYOffset;
-			int x =  point.x-m_TableRect.left-m_TableRectXOffset;
+			int y_offset = m_VScrollBarYOffset*(m_TableRect.Height()-4)/m_VScrollBarHeight;
+			int y = point.y-(m_TableRect.top+2)+y_offset;
+			int x =  point.x-(m_TableRect.left+2)-m_TableRectXOffset;
 
 			int row = y/(HEIGHT+PADDING) + (y%(HEIGHT+PADDING)>0?1:0);
 			int column = x/(WIDTH+PADDING) + (x%(WIDTH+PADDING)>0?1:0);

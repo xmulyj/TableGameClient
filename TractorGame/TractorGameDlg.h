@@ -111,7 +111,7 @@ public:
 	CPoint  m_PreMousePoint;
 
 	int m_VScrollBarHeight;
-	int m_TableRectYOffset;
+	int m_VScrollBarYOffset;
 	int m_TableRectXOffset;
 	CRect m_TableRect;
 	void OnPaint_TableList(CRect &client_rect);
@@ -121,4 +121,6 @@ public:
 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
+
+	CBitmap m_Bitmap;
 };

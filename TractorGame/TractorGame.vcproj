@@ -258,6 +258,30 @@
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
 			>
 			<File
+				RelativePath="C:\Users\Administrator\Desktop\1.bmp"
+				>
+			</File>
+			<File
+				RelativePath=".\1.bmp"
+				>
+			</File>
+			<File
+				RelativePath=".\res\1.bmp"
+				>
+			</File>
+			<File
+				RelativePath="C:\Users\Administrator\Desktop\bg.bmp"
+				>
+			</File>
+			<File
+				RelativePath=".\res\bitmap1.bmp"
+				>
+			</File>
+			<File
+				RelativePath=".\res\bitmap2.bmp"
+				>
+			</File>
+			<File
 				RelativePath=".\res\TractorGame.ico"
 				>
 			</File>
