@@ -125,5 +125,6 @@ public:
 	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
 
 	CBitmap m_BgBmp;
+	CBitmap m_BgBmp2;
 	CBitmap m_TableBmp;
 };

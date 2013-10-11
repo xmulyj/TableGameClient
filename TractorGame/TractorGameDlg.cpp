@@ -155,10 +155,10 @@ BOOL CTractorGameDlg::OnInitDialog()
 	m_RoomListCtrl.GetWindowRect(&m_TableRect);
 	ScreenToClient(&m_TableRect);
 
-	if(m_BgBmp.LoadBitmap(IDB_BG) == TRUE)
-		AppendMsg(_T("load bg bitmap succ\r\n"));
-	if(m_TableBmp.LoadBitmap(IDB_TABLE) == TRUE)
-		AppendMsg(_T("load table bitmap succ\r\n"));
+	m_BgBmp.LoadBitmap(IDB_BG);
+	m_TableBmp.LoadBitmap(IDB_TABLE);
+	m_BgBmp2.LoadBitmap(IDB_BG2);
+
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -982,22 +982,32 @@ void CTractorGameDlg::OnPaint_TableList(CRect &client_rect)
 void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 {
 	CPaintDC dc(this);
+	dc.SetBkMode(TRANSPARENT);
+
 	CRect rect, draw_rect;
 
 	//画外框
+	CPen pen(PS_SOLID, 3, RGB(158, 44, 104));
+	CBrush gb_brush(&m_BgBmp2);
+	CPen *old_pen = dc.SelectObject(&pen);
+	CBrush *old_brush = dc.SelectObject(&gb_brush);
 	dc.Rectangle(&client_rect);
+
 	//画分割线
 	rect = client_rect;
-	rect.left = rect.right-100;
+	rect.left = rect.right-200;
 	dc.MoveTo(rect.left, rect.top);
 	dc.LineTo(rect.left, rect.bottom);
+	dc.SelectStockObject(NULL_PEN);
 
-	//画玩家
-	rect.right = rect.left-2;
-	rect.left = client_rect.left+2;
-	rect.top += 2;
-	rect.bottom -= 2;
-	dc.Rectangle(&rect);
+	rect.right = rect.left-6;
+	rect.left = client_rect.left+6;
+	rect.top += 6;
+	rect.bottom -= 6;
+
+	//圆
+	CBrush brush(RGB(255, 200, 0));	
+	dc.SelectObject(&brush);
 
 	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
 	int i, index = -1;
@@ -1047,9 +1057,10 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 
 		if(pos==3 && m_MyStatus>1)  //自己是玩家
 		{
-			dc.SelectObject(GetStockObject(GRAY_BRUSH));
+			CBrush temp_brush(RGB(34,177,76));
+			dc.SelectObject(&temp_brush);
 			dc.Ellipse(&draw_rect);
-			dc.SelectObject(GetStockObject(WHITE_BRUSH));
+			dc.SelectObject(&brush);
 		}
 		else
 			dc.Ellipse(&draw_rect);
@@ -1064,7 +1075,7 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 			y -= 40;
 		CString lable;
 
-		lable.Format(_T("id:%d "), m_PlayerStatus[i].client_id);
+		lable.Format(_T("uid[%d]:"), m_PlayerStatus[i].client_id);
 		lable += StatusStr[m_PlayerStatus[i].status];
 		if(pos==3 && m_MyStatus>1)
 		{
@@ -1078,15 +1089,8 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 	}
 
 	//画旁观者
-	rect = client_rect;
-	rect.left = rect.right-98;
-	rect.right -=2;
-	rect.top += 2;
-	rect.bottom -= 2;
-	dc.Rectangle(&rect);
-
-	x = rect.left+2;
-	y = rect.top+2;
+	x = client_rect.right-190;
+	y = rect.top+6;
 	for(int i=0; i<m_AudienceStatus.size(); ++i)
 	{
 		CString lable;
@@ -1100,7 +1104,11 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 		}
 		else
 			dc.TextOut(x, y, lable, lable.GetLength());
+		y+=25;
 	}
+
+	dc.SelectObject(old_brush);
+	dc.SelectObject(old_pen);
 }
 
 void CTractorGameDlg::OnLButtonDown(UINT nFlags, CPoint point)

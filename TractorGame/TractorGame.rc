@@ -183,6 +183,7 @@ END
 
 IDB_BG                  BITMAP                  "C:\\Users\\Administrator\\Desktop\\bg.bmp"
 IDB_TABLE               BITMAP                  "C:\\Users\\Administrator\\Desktop\\table.bmp"
+IDB_BG2                 BITMAP                  "C:\\Users\\Administrator\\Desktop\\bg2.bmp"
 
 /////////////////////////////////////////////////////////////////////////////
 //
