@@ -22,7 +22,7 @@ typedef struct _room_info
 {
 	int         RoomID;
 	int         ClientNum;
-	int         PlayerNum;
+	int         NeedNum;
 	string    IP;
 	int         Port;
 
@@ -74,20 +74,22 @@ public:
 	
 	//显示房间列表
 	void PrintRoomList();
-	bool GetAllRoomReq();
-	bool OnGetAllRoomRsp(KVData *kvdata);
+	bool GetRoomListReq();
+	bool OnGetRoomListRsp(KVData *kvdata);
 	bool GetRoomAddrReq();
 	bool OnGetRoomAddrRsp(KVData *kvdata);
 
 	//显示桌子列表
 	void PrintTableList();
-	bool GetRoomInfoReq();
-	bool OnGetRoomInfoRsp(KVData *kvdata);
+	bool IntoRoomReq();
+	bool LeaveRoomReq();
+	bool OnRoomInfoBroadCast(KVData *kvdata);
 	
 	//开始玩游戏
 	void OnAddGame();
-	void OnAddGameRsp(KVData *kvdata);
 	void QuitGameReq();
+	void OnTableInfoBroadCast(KVData *kvdata);
+
 public:
 	int m_UID;
 	string m_UName;

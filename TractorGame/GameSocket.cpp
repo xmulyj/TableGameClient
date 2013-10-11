@@ -136,9 +136,9 @@ void CInterfaceSocket::OnReceiveProtocol( KVData *kvdata)
 
 	int Protocol;
 	kvdata->GetValue(KEY_Protocol, Protocol);
-	if(Protocol == GetAllRoomRsp)
-		pDlg->OnGetAllRoomRsp(kvdata);
-	else if(Protocol == GetRoomAddrRsp)
+	if(Protocol == PRO_GetRoomListRsp)
+		pDlg->OnGetRoomListRsp(kvdata);
+	else if(Protocol == PRO_GetRoomAddrRsp)
 		pDlg->OnGetRoomAddrRsp(kvdata);
 	else
 		assert(0);
@@ -155,7 +155,7 @@ void CRoomSocket::OnConnect(int nErrorCode)
 	{
 		IsConnected = TRUE;
 		if(pDlg->m_CurStatus == Status_PrintTableList)
-			pDlg->GetRoomInfoReq();
+			pDlg->IntoRoomReq();
 		else
 			pDlg->AppendMsg(_T("connect game room succssful, but in error status.\r\n"));
 	}
@@ -170,10 +170,10 @@ void CRoomSocket::OnReceiveProtocol(KVData *kvdata)
 
 	int Protocol;
 	kvdata->GetValue(KEY_Protocol, Protocol);
-	if(Protocol == GetRoomInfoRsp)
-		pDlg->OnGetRoomInfoRsp(kvdata);
-	else if(Protocol == AddGameRsp)
-		pDlg->OnAddGameRsp(kvdata);
+	if(Protocol == PRO_RoomInfoBroadCast)
+		pDlg->OnRoomInfoBroadCast(kvdata);
+	else if(Protocol == PRO_TableInfoBroadCast)
+		pDlg->OnTableInfoBroadCast(kvdata);
 	else
 		assert(0);
 }
