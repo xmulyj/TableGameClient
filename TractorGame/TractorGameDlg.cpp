@@ -70,7 +70,6 @@ void CTractorGameDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialog::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_RoomList, m_RoomListCtrl);
-	DDX_Control(pDX, IDC_TableList, m_TableListCtrl);
 }
 
 BEGIN_MESSAGE_MAP(CTractorGameDlg, CDialog)
@@ -83,11 +82,11 @@ BEGIN_MESSAGE_MAP(CTractorGameDlg, CDialog)
 	ON_BN_CLICKED(IDC_STATIC_ROOM, &CTractorGameDlg::OnStaticRoomClick)
 	ON_WM_TIMER()
 	ON_NOTIFY(NM_DBLCLK, IDC_RoomList, &CTractorGameDlg::OnNMDblclkRoomlist)
-	ON_NOTIFY(NM_DBLCLK, IDC_TableList, &CTractorGameDlg::OnNMDblclkTablelist)
 	ON_WM_LBUTTONDOWN()
 	ON_WM_LBUTTONUP()
 	ON_WM_MOUSEMOVE()
 	ON_WM_LBUTTONDBLCLK()
+	ON_BN_CLICKED(IDC_STARTGAME, &CTractorGameDlg::OnBnClickedStartgame)
 END_MESSAGE_MAP()
 
 
@@ -136,11 +135,6 @@ BOOL CTractorGameDlg::OnInitDialog()
 	//房间列表
 	m_RoomListCtrl.SetExtendedStyle(LVS_EX_FULLROWSELECT|LVS_EX_FLATSB |LVS_EX_SUBITEMIMAGES );
 	m_RoomListCtrl.SetImageList(&m_ImageList,  LVSIL_NORMAL);
-
-	//桌子列表
-	m_TableListCtrl.SetExtendedStyle(LVS_EX_FULLROWSELECT |LVS_EX_FLATSB |LVS_EX_SUBITEMIMAGES);
-	m_TableListCtrl.SetImageList(&m_ImageList,  LVSIL_NORMAL);
-	m_TableListCtrl.ShowWindow(SW_HIDE);
 
 	//WSADATA wsadata;
 	//WSAStartup(MAKEWORD(2,0), &wsadata);
@@ -554,21 +548,6 @@ bool CTractorGameDlg::OnRoomInfoBroadCast(KVData *kvdata)
 		CString temp;
 		temp.Format(_T("->房间[%02d] %d 人"), room_info.RoomID, room_info.ClientNum);
 		GetDlgItem(IDC_STATIC_ROOM)->SetWindowText(temp);
-
-		m_TableListCtrl.SetRedraw(FALSE);
-		m_TableListCtrl.DeleteAllItems();
-		for(int i=0; i<room_info.TableArray.size(); ++i)
-		{
-			int cur_num = 0;
-			int player_array = room_info.TableArray[i];
-			for(int j=0; j<room_info.NeedNum; ++j)
-				if(player_array & 1<<j)
-					++cur_num;
-			temp.Format(_T("桌子[%d] %d人"), i+1, cur_num);
-			m_TableListCtrl.InsertItem(i, temp, 0);
-		}
-		m_TableListCtrl.SetRedraw(TRUE);
-
 		InvalidateRect(m_TableRect);
 	}
 
@@ -663,6 +642,15 @@ void CTractorGameDlg::OnTableInfoBroadCast(KVData *kvdata)
 			m_MyStatus = audience_status.status;
 	}
 
+	if(m_MyStatus == 2)  //等待状态
+	{
+		GetDlgItem(IDC_STARTGAME)->ShowWindow(SW_NORMAL);
+	}
+	else
+	{
+		GetDlgItem(IDC_STARTGAME)->ShowWindow(SW_HIDE);
+	}
+
 	InvalidateRect(&m_TableRect);
 }
 
@@ -741,7 +729,6 @@ void CTractorGameDlg::OnStaticListClick()
 	if(m_CurStatus == Status_PrintTableList)
 	{
 		//KillTimer(2);
-		m_TableListCtrl.ShowWindow(SW_HIDE);
 		GetDlgItem(IDC_STATIC_ROOM)->ShowWindow(SW_HIDE);
 		m_RoomListCtrl.ShowWindow(SW_NORMAL);
 
@@ -762,7 +749,6 @@ void CTractorGameDlg::OnStaticRoomClick()
 
 		temp.Format(_T("->房间[%02d] %d 人"), m_SelectRoomIndex+1, m_RoomList[m_SelectRoomIndex].ClientNum);
 		GetDlgItem(IDC_STATIC_ROOM)->ShowWindow(SW_NORMAL);
-		m_TableListCtrl.ShowWindow(SW_NORMAL);
 		QuitGameReq();
 		m_CurStatus = Status_PrintTableList;
 		//PrintTableList();
@@ -812,38 +798,6 @@ void CTractorGameDlg::OnNMDblclkRoomlist(NMHDR *pNMHDR, LRESULT *pResult)
 
 	*pResult = 0;
 }
-
-void CTractorGameDlg::OnNMDblclkTablelist(NMHDR *pNMHDR, LRESULT *pResult)
-{
-	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
-	// TODO: 在此添加控件通知处理程序代码
-	int index = pNMItemActivate->iItem;
-	if(index >=0 && index<m_TableListCtrl.GetItemCount())
-	{
-		CString temp;
-		temp.Format(_T("Into Table[%d]\r\n"), index);
-		AppendMsg(temp);
-
-		//KillTimer(2);
-		m_SelectTableIndex = index;
-		m_TableListCtrl.ShowWindow(SW_HIDE);
-
-		temp.Format(_T("->房间[%02d]"), m_SelectRoomIndex+1);
-		GetDlgItem(IDC_STATIC_ROOM)->SetWindowText(temp);
-		GetDlgItem(IDC_STATIC_ROOM)->ShowWindow(SW_NORMAL);
-		temp.Format(_T("->桌子[%02d]"), m_SelectTableIndex+1);
-		GetDlgItem(IDC_STATIC_TABLE)->SetWindowText(temp);
-		GetDlgItem(IDC_STATIC_TABLE)->ShowWindow(SW_NORMAL);
-		m_TableListCtrl.ShowWindow(SW_HIDE);
-
-		m_CurStatus = Status_Playing;
-		
-		OnAddGame();
-	}
-
-	*pResult = 0;
-}
-
 
 void CTractorGameDlg::OnPaint_TableList(CRect &client_rect)
 {
@@ -1176,15 +1130,12 @@ void CTractorGameDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
 				AppendMsg(temp);
 
 				//KillTimer(2);
-				m_TableListCtrl.ShowWindow(SW_HIDE);
-
 				temp.Format(_T("->房间[%02d]"), m_SelectRoomIndex+1);
 				GetDlgItem(IDC_STATIC_ROOM)->SetWindowText(temp);
 				GetDlgItem(IDC_STATIC_ROOM)->ShowWindow(SW_NORMAL);
 				temp.Format(_T("->桌子[%02d]"), m_SelectTableIndex+1);
 				GetDlgItem(IDC_STATIC_TABLE)->SetWindowText(temp);
 				GetDlgItem(IDC_STATIC_TABLE)->ShowWindow(SW_NORMAL);
-				m_TableListCtrl.ShowWindow(SW_HIDE);
 
 				InvalidateRect(&m_TableRect);
 				OnAddGame();
@@ -1194,4 +1145,48 @@ void CTractorGameDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
 	}
 
 	CDialog::OnLButtonDblClk(nFlags, point);
+}
+
+void CTractorGameDlg::OnBnClickedStartgame()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	if(!m_RoomSocket.IsConnected || m_CurStatus!=Status_Playing)
+		return ;
+	if(m_CurStatus != Status_Playing)
+		return ;
+	if(!m_RoomSocket.IsConnected)
+	{
+		m_CurStatus = Status_PrintTableList;
+		PrintTableList();
+		return;
+	}
+
+	assert(m_SelectRoomIndex>=0 && m_SelectRoomIndex<m_RoomList.size());
+	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
+
+	//Send AddGame request
+	KVData kvdata(true);
+	kvdata.SetValue(KEY_Protocol, PRO_StartGame);
+	kvdata.SetValue(KEY_RoomID, room_info.RoomID);
+	kvdata.SetValue(KEY_TableID, m_SelectTableIndex);
+	kvdata.SetValue(KEY_ClientID, m_UID);
+	kvdata.SetValue(KEY_ClientName, m_UName);
+
+	KVDataProtocolFactory factory;
+	unsigned int header_size = factory.HeaderSize();
+	unsigned int body_size = kvdata.Size();
+	ProtocolContext *context = new ProtocolContext(header_size+body_size);
+	context->type = DTYPE_BIN;
+	context->Info = "StartGame";
+
+	kvdata.Serialize(context->Buffer+header_size);
+	context->Size = header_size+body_size;
+	factory.EncodeHeader(context->Buffer, body_size);
+
+	m_RoomSocket.m_SendContext = context;
+	m_RoomSocket.AsyncSelect(FD_WRITE|FD_READ|FD_CLOSE);
+
+	CString temp;
+	temp.Format(_T("send StartGame request\r\n"));
+	AppendMsg(temp);
 }

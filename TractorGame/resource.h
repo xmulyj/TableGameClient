@@ -18,10 +18,11 @@
 #define IDC_UID                         1004
 #define IDC_UNAME                       1005
 #define IDC_LOAD                        1006
-#define IDC_TableList                   1007
 #define IDC_STATIC_ROOM                 1008
 #define IDC_STATIC_TABLE                1009
 #define IDC_STATIC_LIST                 1010
+#define IDC_BUTTON1                     1011
+#define IDC_STARTGAME                   1011
 
 // Next default values for new objects
 // 
@@ -29,7 +30,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        146
 #define _APS_NEXT_COMMAND_VALUE         32771
-#define _APS_NEXT_CONTROL_VALUE         1011
+#define _APS_NEXT_CONTROL_VALUE         1012
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

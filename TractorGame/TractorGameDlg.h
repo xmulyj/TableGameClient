@@ -65,8 +65,6 @@ public:
 	CListCtrl m_RoomListCtrl;
 	CImageList m_ImageList;
 
-	CListCtrl m_TableListCtrl;
-
 	CInterfaceSocket m_InterfaceSocket;
 	CRoomSocket m_RoomSocket;
 
@@ -107,7 +105,6 @@ public:
 	afx_msg void OnStaticRoomClick();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnNMDblclkRoomlist(NMHDR *pNMHDR, LRESULT *pResult);
-	afx_msg void OnNMDblclkTablelist(NMHDR *pNMHDR, LRESULT *pResult);
 public:
 	BOOL m_LButtonDown;
 	CPoint  m_PreMousePoint;
@@ -127,4 +124,5 @@ public:
 	CBitmap m_BgBmp;
 	CBitmap m_BgBmp2;
 	CBitmap m_TableBmp;
+	afx_msg void OnBnClickedStartgame();
 };
