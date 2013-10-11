@@ -155,8 +155,10 @@ BOOL CTractorGameDlg::OnInitDialog()
 	m_RoomListCtrl.GetWindowRect(&m_TableRect);
 	ScreenToClient(&m_TableRect);
 
-	if(m_Bitmap.LoadBitmap(IDB_BITMAP1) == TRUE)
-		AppendMsg(_T("load bitmap succ\r\n"));
+	if(m_BgBmp.LoadBitmap(IDB_BG) == TRUE)
+		AppendMsg(_T("load bg bitmap succ\r\n"));
+	if(m_TableBmp.LoadBitmap(IDB_TABLE) == TRUE)
+		AppendMsg(_T("load table bitmap succ\r\n"));
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -846,16 +848,20 @@ void CTractorGameDlg::OnNMDblclkTablelist(NMHDR *pNMHDR, LRESULT *pResult)
 void CTractorGameDlg::OnPaint_TableList(CRect &client_rect)
 {
 	CPaintDC dc(this);
+	dc.SetBkMode(TRANSPARENT);
+	CDC MemDc;
+	MemDc.CreateCompatibleDC(&dc);
+	CBitmap *old_bitmap = MemDc.SelectObject(&m_TableBmp);
+
 	CPen *old_pen;
 	CRect rect, draw_rect;
-
 	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
 
 	//画外框
-	CBrush gb_brush(&m_Bitmap);
+	CBrush gb_brush(&m_BgBmp);
 	CBrush *old_brush = dc.SelectObject(&gb_brush);
 	dc.Rectangle(&client_rect);
-	dc.SelectObject(old_brush);
+	 dc.SelectObject(old_brush);
 
 	//画滚动条外框
 	draw_rect.left = client_rect.right-VSCROLL_WIDTH;
@@ -887,7 +893,6 @@ void CTractorGameDlg::OnPaint_TableList(CRect &client_rect)
 		dc.SelectObject(&pen);
 		dc.Rectangle(&draw_rect);
 	}
-	dc.SelectObject(old_pen);
 
 	//画桌子
 	m_TableRectXOffset = (rect.Width()-(TABLE_NUM*WIDTH+(TABLE_NUM-1)*PADDING))/2;
@@ -900,21 +905,14 @@ void CTractorGameDlg::OnPaint_TableList(CRect &client_rect)
 	draw_rect.bottom = draw_rect.top+HEIGHT;
 
 	//画桌子
+	dc.SelectStockObject(NULL_PEN);
+	CBrush brush(RGB(255, 200, 0));
+	dc.SelectObject(&brush);
 	for(int i=0; i<room_info.TableArray.size(); ++i)
 	{
-		CRect table_rect, player_rect;
+		CRect player_rect;
+		dc.BitBlt(draw_rect.left, draw_rect.top, draw_rect.Width(), draw_rect.Width(), &MemDc, 0, 0, SRCCOPY);
 
-		CBrush brush(RGB(225,225, 225));
-		CBrush *old_brush = (CBrush *)dc.SelectObject(&brush); 
-		dc.Rectangle(&draw_rect);
-		dc.SelectObject(GetStockObject(WHITE_BRUSH)); 
-
-		//table
-		table_rect.left = draw_rect.left+25;
-		table_rect.right = table_rect.left+50;
-		table_rect.top = draw_rect.top+25;
-		table_rect.bottom = table_rect.top+50;
-		dc.Rectangle(&table_rect);
 		CString lable;
 		lable.Format(_T("%d"), i+1);
 		dc.TextOut((draw_rect.left+draw_rect.right)/2,(draw_rect.top+draw_rect.bottom)/2, lable, lable.GetLength());
@@ -929,32 +927,31 @@ void CTractorGameDlg::OnPaint_TableList(CRect &client_rect)
 			int x, y;
 			if(j==0)
 			{
-				x = (draw_rect.left+table_rect.left)/2;
+				x = draw_rect.left+13;
 				y = (draw_rect.top+draw_rect.bottom)/2;
 			}
 			else if(j==1)
 			{
 				x = (draw_rect.left+draw_rect.right)/2;
-				y = (draw_rect.top+table_rect.top)/2;
+				y = draw_rect.top+13;
 			}
 			else if(j==2)
 			{
-				x = (table_rect.right+draw_rect.right)/2;
+				x = draw_rect.right-13;
 				y = (draw_rect.top+draw_rect.bottom)/2;
 			}
 			else
 			{
 				x = (draw_rect.left+draw_rect.right)/2;
-				y = (table_rect.bottom+draw_rect.bottom)/2;
+				y = draw_rect.bottom-13;
 			}
 
 			player_rect.left = x-10;
 			player_rect.right = x+10;
 			player_rect.top = y-10;
 			player_rect.bottom = y+10;
-
+			
 			dc.Ellipse(&player_rect);
-			dc.SelectObject(old_brush);
 		}
 
 		if((i+1) % TABLE_NUM == 0)
@@ -971,10 +968,14 @@ void CTractorGameDlg::OnPaint_TableList(CRect &client_rect)
 			draw_rect.right = draw_rect.left+WIDTH;
 		}
 	}
+	MemDc.SelectObject(old_bitmap);
 
+	dc.SelectObject(old_pen);
 	dc.SelectObject(GetStockObject(NULL_BRUSH));
 	dc.Rectangle(&client_rect);
 	dc.SelectObject(old_brush);
+
+	
 }
 
 

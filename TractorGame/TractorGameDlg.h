@@ -124,5 +124,6 @@ public:
 	afx_msg void OnMouseMove(UINT nFlags, CPoint point);
 	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
 
-	CBitmap m_Bitmap;
+	CBitmap m_BgBmp;
+	CBitmap m_TableBmp;
 };
