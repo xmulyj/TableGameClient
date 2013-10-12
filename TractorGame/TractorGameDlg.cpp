@@ -87,6 +87,7 @@ BEGIN_MESSAGE_MAP(CTractorGameDlg, CDialog)
 	ON_WM_MOUSEMOVE()
 	ON_WM_LBUTTONDBLCLK()
 	ON_BN_CLICKED(IDC_STARTGAME, &CTractorGameDlg::OnBnClickedStartgame)
+	ON_BN_CLICKED(IDC_ADDGAME, &CTractorGameDlg::OnBnClickedAddgame)
 END_MESSAGE_MAP()
 
 
@@ -645,10 +646,20 @@ void CTractorGameDlg::OnTableInfoBroadCast(KVData *kvdata)
 	if(m_MyStatus == 2)  //等待状态
 	{
 		GetDlgItem(IDC_STARTGAME)->ShowWindow(SW_NORMAL);
+		GetDlgItem(IDC_ADDGAME)->ShowWindow(SW_HIDE);
+	}
+	else if(m_MyStatus == 1)  //旁观者
+	{
+		GetDlgItem(IDC_STARTGAME)->ShowWindow(SW_HIDE);
+		if(PlayerNum < NeedNum)
+			GetDlgItem(IDC_ADDGAME)->ShowWindow(SW_NORMAL);
+		else
+			GetDlgItem(IDC_ADDGAME)->ShowWindow(SW_HIDE);
 	}
 	else
 	{
 		GetDlgItem(IDC_STARTGAME)->ShowWindow(SW_HIDE);
+		GetDlgItem(IDC_ADDGAME)->ShowWindow(SW_HIDE);
 	}
 
 	InvalidateRect(&m_TableRect);
@@ -692,6 +703,42 @@ void CTractorGameDlg::QuitGameReq()
 	CString temp;
 	temp.Format(_T("send QuitGame request\r\n"));
 	AppendMsg(temp);
+}
+
+void CTractorGameDlg::OnDealPoker(KVData *kvdata)
+{
+	AppendMsg(_T("OnDealPoker\r\n"));
+
+	int CardFlag = -1;
+	char *Array = NULL;
+	uint32_t size;
+	int poker[20];
+
+	kvdata->GetValue(KEY_CardFlag, CardFlag);
+	bool IsSetArray  = kvdata->GetValue(KEY_Array, Array, size);
+	assert((m_MyStatus==1 && IsSetArray==true) || (m_MyStatus==3 && IsSetArray==true));
+	
+	int CardNum = 0;
+	if(IsSetArray == true)
+	{
+		CardNum = CardFlag==0?1:CardFlag;
+		int *ppoker = (int*)Array;
+		for(int i=0; i<CardNum; ++i)
+			poker[i] = ntohl(ppoker[i]);
+	}
+
+	for(int i=0; i<m_PlayerStatus.size(); ++i)
+	{
+		if(m_PlayerStatus[i].client_id==m_UID)
+		{
+			for(int j=0; j<CardNum; j++)
+				m_PlayerStatus[i].poker.push_back(poker[j]);
+		}
+		else
+			m_PlayerStatus[i].poker.push_back(-1);
+	}
+
+	InvalidateRect(&m_TableRect);
 }
 
 void CTractorGameDlg::OnBnClickedLoad()
@@ -1027,10 +1074,19 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 			x -= 50;
 		else if(pos == 3)
 			y -= 40;
-		CString lable;
+		CString lable, poker;
 
 		lable.Format(_T("uid[%d]:"), m_PlayerStatus[i].client_id);
 		lable += StatusStr[m_PlayerStatus[i].status];
+
+		for(int npoker=0; npoker<m_PlayerStatus[i].poker.size(); ++npoker)
+		{
+			if(m_PlayerStatus[i].poker[npoker] < 0)
+				poker.Format(_T("*,"));
+			else
+				poker.Format(_T("%d,"), m_PlayerStatus[i].poker[npoker]);
+			lable += poker;
+		}
 		if(pos==3 && m_MyStatus>1)
 		{
 			COLORREF old_color = dc.GetTextColor();
@@ -1038,7 +1094,7 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 			dc.TextOut(x, y, lable, lable.GetLength());
 			dc.SetTextColor(old_color);
 		}
-		else
+		else\
 			dc.TextOut(x, y, lable, lable.GetLength());
 	}
 
@@ -1149,11 +1205,6 @@ void CTractorGameDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
 
 void CTractorGameDlg::OnBnClickedStartgame()
 {
-	// TODO: 在此添加控件通知处理程序代码
-	if(!m_RoomSocket.IsConnected || m_CurStatus!=Status_Playing)
-		return ;
-	if(m_CurStatus != Status_Playing)
-		return ;
 	if(!m_RoomSocket.IsConnected)
 	{
 		m_CurStatus = Status_PrintTableList;
@@ -1189,4 +1240,16 @@ void CTractorGameDlg::OnBnClickedStartgame()
 	CString temp;
 	temp.Format(_T("send StartGame request\r\n"));
 	AppendMsg(temp);
+}
+
+void CTractorGameDlg::OnBnClickedAddgame()
+{
+	if(!m_RoomSocket.IsConnected)
+	{
+		m_CurStatus = Status_PrintTableList;
+		PrintTableList();
+		return;
+	}
+
+	OnAddGame();
 }

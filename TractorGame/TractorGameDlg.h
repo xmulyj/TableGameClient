@@ -33,6 +33,7 @@ typedef struct _client_status_
 {
 	int   client_id;
 	int	status;
+	vector<int> poker;
 }TableStatus;
 
 // CTractorGameDlg 对话框
@@ -86,6 +87,7 @@ public:
 	//开始玩游戏
 	void OnAddGame();
 	void QuitGameReq();
+	void OnDealPoker(KVData *kvdata);
 	void OnTableInfoBroadCast(KVData *kvdata);
 
 public:
@@ -125,4 +127,5 @@ public:
 	CBitmap m_BgBmp2;
 	CBitmap m_TableBmp;
 	afx_msg void OnBnClickedStartgame();
+	afx_msg void OnBnClickedAddgame();
 };

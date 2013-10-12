@@ -107,6 +107,7 @@ BEGIN
     LTEXT           "->房间[10]",IDC_STATIC_ROOM,38,29,73,8,SS_NOTIFY | NOT WS_VISIBLE
     LTEXT           "->桌子[20]",IDC_STATIC_TABLE,76,29,36,8,NOT WS_VISIBLE
     PUSHBUTTON      "开始",IDC_STARTGAME,225,25,50,14,NOT WS_VISIBLE
+    PUSHBUTTON      "加入",IDC_ADDGAME,280,25,50,14,NOT WS_VISIBLE
 END
 
 
@@ -181,9 +182,9 @@ END
 // Bitmap
 //
 
-IDB_BG                  BITMAP                  "C:\\Users\\Administrator\\Desktop\\bg.bmp"
-IDB_TABLE               BITMAP                  "C:\\Users\\Administrator\\Desktop\\table.bmp"
-IDB_BG2                 BITMAP                  "C:\\Users\\Administrator\\Desktop\\bg2.bmp"
+IDB_BG                  BITMAP                  "res\\bg.bmp"
+IDB_TABLE               BITMAP                  "res\\table.bmp"
+IDB_BG2                 BITMAP                  "res\\bg2.bmp"
 
 /////////////////////////////////////////////////////////////////////////////
 //

@@ -258,11 +258,23 @@
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
 			>
 			<File
+				RelativePath=".\res\bg.bmp"
+				>
+			</File>
+			<File
 				RelativePath="C:\Users\Administrator\Desktop\bg.bmp"
 				>
 			</File>
 			<File
 				RelativePath="C:\Users\Administrator\Desktop\bg2.bmp"
+				>
+			</File>
+			<File
+				RelativePath=".\res\bg2.bmp"
+				>
+			</File>
+			<File
+				RelativePath=".\res\table.bmp"
 				>
 			</File>
 			<File

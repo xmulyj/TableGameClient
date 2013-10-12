@@ -174,6 +174,8 @@ void CRoomSocket::OnReceiveProtocol(KVData *kvdata)
 		pDlg->OnRoomInfoBroadCast(kvdata);
 	else if(Protocol == PRO_TableInfoBroadCast)
 		pDlg->OnTableInfoBroadCast(kvdata);
+	else if(Protocol == PRO_DealPoker)
+		pDlg->OnDealPoker(kvdata);
 	else
 		assert(0);
 }
