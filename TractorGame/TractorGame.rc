@@ -88,26 +88,26 @@ BEGIN
     DEFPUSHBUTTON   "确定",IDOK,113,41,50,14,WS_GROUP
 END
 
-IDD_TRACTORGAME_DIALOG DIALOGEX 0, 0, 507, 357
+IDD_TRACTORGAME_DIALOG DIALOGEX 0, 0, 535, 321
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 EXSTYLE WS_EX_APPWINDOW
 CAPTION "TractorGame"
 FONT 9, "MS Shell Dlg", 0, 0, 0x1
 BEGIN
-    DEFPUSHBUTTON   "确定",IDOK,382,336,50,14
-    PUSHBUTTON      "取消",IDCANCEL,450,336,50,14
-    CONTROL         "",IDC_RoomList,"SysListView32",LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOCOLUMNHEADER | WS_BORDER | WS_TABSTOP,7,42,493,189
-    CONTROL         "",IDC_MSG,"RichEdit20W",ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_TABSTOP,7,236,493,97,WS_EX_STATICEDGE
+    DEFPUSHBUTTON   "确定",IDOK,478,7,50,14
+    CONTROL         "",IDC_RoomList,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOCOLUMNHEADER | WS_BORDER | WS_TABSTOP,7,42,69,157
+    CONTROL         "",IDC_MSG,"RichEdit20W",ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL | WS_TABSTOP,7,204,69,110,WS_EX_STATICEDGE
     LTEXT           "用户ID:",IDC_STATIC,7,7,24,8
     EDITTEXT        IDC_UID,32,7,63,14,ES_AUTOHSCROLL
     LTEXT           "用户昵称:",IDC_STATIC,106,7,31,8
     EDITTEXT        IDC_UNAME,138,7,58,14,ES_AUTOHSCROLL
-    PUSHBUTTON      "登录",IDC_LOAD,450,7,50,14
+    PUSHBUTTON      "登录",IDC_LOAD,210,7,35,14
     LTEXT           "房间列表",IDC_STATIC_LIST,7,29,29,8,SS_NOTIFY
-    LTEXT           "->房间[10]",IDC_STATIC_ROOM,38,29,73,8,SS_NOTIFY | NOT WS_VISIBLE
-    LTEXT           "->桌子[20]",IDC_STATIC_TABLE,76,29,36,8,NOT WS_VISIBLE
-    PUSHBUTTON      "开始",IDC_STARTGAME,225,25,50,14,NOT WS_VISIBLE
-    PUSHBUTTON      "加入",IDC_ADDGAME,280,25,50,14,NOT WS_VISIBLE
+    LTEXT           "房间",IDC_STATIC_ROOM,79,31,73,8,SS_NOTIFY | NOT WS_GROUP
+    LTEXT           "->桌子[20] 10人",IDC_STATIC_TABLE,111,31,53,8,NOT WS_VISIBLE | NOT WS_GROUP
+    PUSHBUTTON      "开始",IDC_STARTGAME,295,7,50,14,NOT WS_VISIBLE
+    PUSHBUTTON      "加入",IDC_ADDGAME,346,7,50,14,NOT WS_VISIBLE
+    CONTROL         "",IDC_RoomRect,"SysListView32",LVS_ALIGNLEFT | NOT WS_VISIBLE | WS_BORDER | WS_TABSTOP,79,42,449,272
 END
 
 
@@ -169,9 +169,9 @@ BEGIN
     IDD_TRACTORGAME_DIALOG, DIALOG
     BEGIN
         LEFTMARGIN, 7
-        RIGHTMARGIN, 500
+        RIGHTMARGIN, 528
         TOPMARGIN, 7
-        BOTTOMMARGIN, 350
+        BOTTOMMARGIN, 314
     END
 END
 #endif    // APSTUDIO_INVOKED
@@ -185,6 +185,64 @@ END
 IDB_BG                  BITMAP                  "res\\bg.bmp"
 IDB_TABLE               BITMAP                  "res\\table.bmp"
 IDB_BG2                 BITMAP                  "res\\bg2.bmp"
+IDB_HongXin2            BITMAP                  "res\\红心2.bmp"
+IDB_HongXin3            BITMAP                  "res\\红心3.bmp"
+IDB_HongXin4            BITMAP                  "res\\红心4.bmp"
+IDB_HongXin5            BITMAP                  "res\\红心5.bmp"
+IDB_HongXin6            BITMAP                  "res\\红心6.bmp"
+IDB_HongXin7            BITMAP                  "res\\红心7.bmp"
+IDB_HongXin8            BITMAP                  "res\\红心8.bmp"
+IDB_HongXin9            BITMAP                  "res\\红心9.bmp"
+IDB_HongXin10           BITMAP                  "res\\红心10.bmp"
+IDB_HongXinA            BITMAP                  "res\\红心A.bmp"
+IDB_HongXinJ            BITMAP                  "res\\红心J.bmp"
+IDB_HongXinK            BITMAP                  "res\\红心K.bmp"
+IDB_HongXinQ            BITMAP                  "res\\红心Q.bmp"
+IDB_HeiTao2             BITMAP                  "res\\黑桃2.bmp"
+IDB_HeiTao3             BITMAP                  "res\\黑桃3.bmp"
+IDB_HeiTao4             BITMAP                  "res\\黑桃4.bmp"
+IDB_HeiTao5             BITMAP                  "res\\黑桃5.bmp"
+IDB_HeiTao6             BITMAP                  "res\\黑桃6.bmp"
+IDB_HeiTao7             BITMAP                  "res\\黑桃7.bmp"
+IDB_HeiTao8             BITMAP                  "res\\黑桃8.bmp"
+IDB_HeiTao9             BITMAP                  "res\\黑桃9.bmp"
+IDB_HeiTao10            BITMAP                  "res\\黑桃10.bmp"
+IDB_HeiTaoJ             BITMAP                  "res\\黑桃A.bmp"
+IDB_HeiTaoQ             BITMAP                  "res\\黑桃J.bmp"
+IDB_HeiTaoK             BITMAP                  "res\\黑桃K.bmp"
+IDB_HeiTaoA             BITMAP                  "res\\黑桃Q.bmp"
+IDB_FangKuai2           BITMAP                  "res\\方块2.bmp"
+IDB_FangKuai3           BITMAP                  "res\\方块3.bmp"
+IDB_FangKuai4           BITMAP                  "res\\方块4.bmp"
+IDB_FangKuai5           BITMAP                  "res\\方块5.bmp"
+IDB_FangKuai6           BITMAP                  "res\\方块6.bmp"
+IDB_FangKuai7           BITMAP                  "res\\方块7.bmp"
+IDB_FangKuai8           BITMAP                  "res\\方块8.bmp"
+IDB_FangKuai9           BITMAP                  "res\\方块9.bmp"
+IDB_FangKuai10          BITMAP                  "res\\方块10.bmp"
+IDB_FangKuaiJ           BITMAP                  "res\\方块A.bmp"
+IDB_FangKuaiQ           BITMAP                  "res\\方块J.bmp"
+IDB_FangKuaiK           BITMAP                  "res\\方块K.bmp"
+IDB_FangKuaiA           BITMAP                  "res\\方块Q.bmp"
+IDB_CaoHua2             BITMAP                  "res\\草花2.bmp"
+IDB_CaoHua3             BITMAP                  "res\\草花3.bmp"
+IDB_CaoHua4             BITMAP                  "res\\草花4.bmp"
+IDB_CaoHua5             BITMAP                  "res\\草花5.bmp"
+IDB_CaoHua6             BITMAP                  "res\\草花6.bmp"
+IDB_CaoHua7             BITMAP                  "res\\草花7.bmp"
+IDB_CaoHua8             BITMAP                  "res\\草花8.bmp"
+IDB_CaoHua9             BITMAP                  "res\\草花9.bmp"
+IDB_CaoHua10            BITMAP                  "res\\草花10.bmp"
+IDB_CaoHuaJ             BITMAP                  "res\\草花A.bmp"
+IDB_CaoHuaQ             BITMAP                  "res\\草花J.bmp"
+IDB_CaoHuaK             BITMAP                  "res\\草花K.bmp"
+IDB_CaoHuaA             BITMAP                  "res\\草花Q.bmp"
+IDB_PokerBgMask         BITMAP                  "res\\bg_mask.bmp"
+IDB_PokerFtMask         BITMAP                  "res\\ft_mask.bmp"
+IDB_JOKER0              BITMAP                  "res\\Joker0.bmp"
+IDB_JOKER1              BITMAP                  "res\\Joker1.bmp"
+IDB_PokerHBack          BITMAP                  "res\\hback.bmp"
+IDB_PokerVBack          BITMAP                  "res\\vback.bmp"
 
 /////////////////////////////////////////////////////////////////////////////
 //

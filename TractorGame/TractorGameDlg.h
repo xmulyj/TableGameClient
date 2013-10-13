@@ -11,9 +11,14 @@
 #include <vector>
 using namespace std;
 
+typedef enum
+{
+	Interface_GetRoomList,
+	Interface_GetRoomAddr,
+}InterfaceStatus;
+
 typedef enum 
 {
-	Status_PrintRoomList,
 	Status_PrintTableList,
 	Status_Playing,
 }ClientStatus;
@@ -35,6 +40,7 @@ typedef struct _client_status_
 	int	status;
 	vector<int> poker;
 }TableStatus;
+
 
 // CTractorGameDlg 对话框
 class CTractorGameDlg : public CDialog
@@ -62,24 +68,23 @@ protected:
 	DECLARE_MESSAGE_MAP()
 public:
 	void AppendMsg(LPCTSTR msg);
+	void SendProtocol(ProtocolContext *context, CGameSocket *gamesocket);
 public:
 	CListCtrl m_RoomListCtrl;
-	CImageList m_ImageList;
 
-	CInterfaceSocket m_InterfaceSocket;
-	CRoomSocket m_RoomSocket;
+	CGameSocket m_InterfaceSocket;
+	CGameSocket m_RoomSocket;
 
 	ClientStatus m_CurStatus;
 	
+	void OnReceiveProtocol(KVData *kvdata);
 	//显示房间列表
-	void PrintRoomList();
 	bool GetRoomListReq();
 	bool OnGetRoomListRsp(KVData *kvdata);
 	bool GetRoomAddrReq();
 	bool OnGetRoomAddrRsp(KVData *kvdata);
 
 	//显示桌子列表
-	void PrintTableList();
 	bool IntoRoomReq();
 	bool LeaveRoomReq();
 	bool OnRoomInfoBroadCast(KVData *kvdata);
@@ -103,7 +108,6 @@ public:
 	int m_MyStatus;   //0(无效),1(旁观者),2(等待开始),3(已经开始)
 
 	afx_msg void OnBnClickedLoad();
-	afx_msg void OnStaticListClick();
 	afx_msg void OnStaticRoomClick();
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg void OnNMDblclkRoomlist(NMHDR *pNMHDR, LRESULT *pResult);
@@ -128,4 +132,11 @@ public:
 	CBitmap m_TableBmp;
 	afx_msg void OnBnClickedStartgame();
 	afx_msg void OnBnClickedAddgame();
+
+	//Poker Bitmap;
+	CBitmap m_PokerBmp[54];
+	CBitmap m_BgMaskBmp;
+	CBitmap m_FtMaskBmp;
+	CBitmap m_HBackBmp;  //扑克背面(横)
+	CBitmap m_VBackBmp;  //扑克背面(竖)
 };

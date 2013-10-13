@@ -15,14 +15,77 @@ using namespace easynet;
 #define new DEBUG_NEW
 #endif
 
-#define INTERFACE_IP  _T("192.168.80.130")
+//#define INTERFACE_IP  _T("192.168.80.130")
+#define INTERFACE_IP  _T("192.168.179.129")
 
 #define TABLE_NUM             6       //一行显示桌子数
 #define HEIGHT                      100  //桌子高
 #define WIDTH                       100  //桌子宽
-#define PADDING                   40    //桌子间隔
+#define PADDING                   10    //桌子间隔
 #define VSCROLL_WIDTH   16   //滚动条宽
 
+
+void CTractorGameDlg::SendProtocol(ProtocolContext *context, CGameSocket *gamesocket)
+{
+	CString msg(context->Info.c_str());
+	msg += _T(":Start to send\r\n");
+
+	//设置socket数据
+	if(gamesocket->IsConnected == FALSE)
+	{
+		//connect to interface
+		AppendMsg(_T("connect to server,wait please...\r\n"));
+
+		gamesocket->Create();
+		if(TRUE==gamesocket->Connect(gamesocket->IP, gamesocket->Port))
+		{
+			gamesocket->IsConnected = TRUE;
+			AppendMsg(_T("connect to server successful.\r\n"));
+		}
+		else
+		{
+			CString temp;
+			uint32_t error_code = WSAGetLastError();
+
+			if(error_code == WSAEWOULDBLOCK)
+			{
+				temp.Format(_T("connect server WouldBlock Port=%d\r\n"), gamesocket->Port);
+				AppendMsg(temp);
+
+				gamesocket->m_SendContext = context;
+				gamesocket->AsyncSelect(FD_CONNECT);
+			}
+			else
+			{
+				temp.Format(_T("connect server failed. error_code=%u\r\n"), error_code);
+				AppendMsg(temp);
+				gamesocket->Close();
+			}
+			return ;
+		}
+	}
+	else
+	{
+		int send_size = gamesocket->Send(context->Buffer, context->Size);
+		if(send_size != context->Size)
+		{
+			if((send_size == -1&&WSAGetLastError()==WSAEWOULDBLOCK) || send_size>0)
+			{
+				context->send_size = send_size>0?send_size:0;
+				gamesocket->m_SendContext = context;
+				gamesocket->AsyncSelect(FD_WRITE|FD_CLOSE);
+				return ;
+			}
+			else
+				AppendMsg(_T("send GetRoomListReq error.\r\n"));
+		}
+		else
+		{
+			AppendMsg(_T("send GetRoomListReq finished.\r\n"));
+		}
+		delete context;
+	}
+}
 
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
 
@@ -78,7 +141,6 @@ BEGIN_MESSAGE_MAP(CTractorGameDlg, CDialog)
 	ON_WM_QUERYDRAGICON()
 	//}}AFX_MSG_MAP
 	ON_BN_CLICKED(IDC_LOAD, &CTractorGameDlg::OnBnClickedLoad)
-	ON_BN_CLICKED(IDC_STATIC_LIST, &CTractorGameDlg::OnStaticListClick)
 	ON_BN_CLICKED(IDC_STATIC_ROOM, &CTractorGameDlg::OnStaticRoomClick)
 	ON_WM_TIMER()
 	ON_NOTIFY(NM_DBLCLK, IDC_RoomList, &CTractorGameDlg::OnNMDblclkRoomlist)
@@ -122,37 +184,44 @@ BOOL CTractorGameDlg::OnInitDialog()
 	SetIcon(m_hIcon, TRUE);			// 设置大图标
 	SetIcon(m_hIcon, FALSE);		// 设置小图标
 
+	//Socket
+	m_InterfaceSocket.IP = INTERFACE_IP;
+	m_InterfaceSocket.Port = 3000;
+
+
 	// TODO: 在此添加额外的初始化代码
 	m_UID = -1;
 	m_SelectRoomIndex = -1;
 	m_SelectTableIndex = -1;
 
-
-	HICON  hicon;
-	hicon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
-	m_ImageList.Create(64,64, ILC_COLORDDB, 1,1);
-	m_ImageList.Add(hicon);
-
 	//房间列表
-	m_RoomListCtrl.SetExtendedStyle(LVS_EX_FULLROWSELECT|LVS_EX_FLATSB |LVS_EX_SUBITEMIMAGES );
-	m_RoomListCtrl.SetImageList(&m_ImageList,  LVSIL_NORMAL);
+	m_RoomListCtrl.SetExtendedStyle(LVS_EX_FULLROWSELECT|LVS_EX_FLATSB |LVS_EX_GRIDLINES);
+	m_RoomListCtrl.InsertColumn(0, _T(""), LVCFMT_LEFT, 150);
 
 	//WSADATA wsadata;
 	//WSAStartup(MAKEWORD(2,0), &wsadata);
 
-	m_CurStatus = Status_PrintRoomList;
+	m_CurStatus = Status_PrintTableList;
 
 	//绘图
 	m_VScrollBarHeight = 0;
 	m_VScrollBarYOffset = 0;
 	m_TableRectXOffset = 0;
 	m_LButtonDown = FALSE;
-	m_RoomListCtrl.GetWindowRect(&m_TableRect);
+	GetDlgItem(IDC_RoomRect)->GetWindowRect(&m_TableRect);
 	ScreenToClient(&m_TableRect);
 
 	m_BgBmp.LoadBitmap(IDB_BG);
 	m_TableBmp.LoadBitmap(IDB_TABLE);
 	m_BgBmp2.LoadBitmap(IDB_BG2);
+
+	//加载扑克牌
+	for(int i=0; i<54; ++i)
+		m_PokerBmp[i].LoadBitmap(IDB_HongXin2+i);
+	m_BgMaskBmp.LoadBitmap(IDB_PokerBgMask);
+	m_FtMaskBmp.LoadBitmap(IDB_PokerFtMask);
+	m_HBackBmp.LoadBitmap(IDB_PokerHBack);
+	m_VBackBmp.LoadBitmap(IDB_PokerVBack);
 
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -222,80 +291,47 @@ void CTractorGameDlg::AppendMsg(LPCTSTR msg)
 	msg_ctrl->ReplaceSel(msg);
 }
 
-//打印房间列表
-void CTractorGameDlg::PrintRoomList()
+void CTractorGameDlg::OnReceiveProtocol(KVData *kvdata)
 {
-	if(m_CurStatus != Status_PrintRoomList)
-	{
-		AppendMsg(_T("Error:current status is [PrintRoomList]\r\n"));
-		return ;
-	}
-
-	GetRoomListReq();
+	int Protocol;
+	kvdata->GetValue(KEY_Protocol, Protocol);
+	if(Protocol == PRO_GetRoomListRsp)
+		OnGetRoomListRsp(kvdata);
+	else if(Protocol == PRO_GetRoomAddrRsp)
+		OnGetRoomAddrRsp(kvdata);
+	else if(Protocol == PRO_RoomInfoBroadCast)
+		OnRoomInfoBroadCast(kvdata);
+	else if(Protocol == PRO_TableInfoBroadCast)
+		OnTableInfoBroadCast(kvdata);
+	else if(Protocol == PRO_DealPoker)
+		OnDealPoker(kvdata);
+	else
+		assert(0);
 }
 
 bool CTractorGameDlg::GetRoomListReq()
 {
-	if(!m_InterfaceSocket.IsConnected)
-	{
-		//connect to interface
-		AppendMsg(_T("connect to game interface,wait please...\r\n"));
-
-		m_InterfaceSocket.Create();
-		if(TRUE==m_InterfaceSocket.Connect(INTERFACE_IP, 3000))
-		{
-			m_CurStatus = Status_PrintRoomList;
-			m_InterfaceSocket.IsConnected = TRUE;
-
-			AppendMsg(_T("connect game_interface successful.\r\n"));
-		}
-		else
-		{
-			CString temp;
-			uint32_t error_code = WSAGetLastError();
-
-			if(error_code == WSAEWOULDBLOCK)
-			{
-				temp.Format(_T("connect game interface WouldBlock\r\n"));
-				AppendMsg(temp);
-				m_InterfaceSocket.AsyncSelect(FD_READ|FD_CONNECT);
-			}
-			else
-			{
-				temp.Format(_T("connect game interface failed. error_code=%u\r\n"), error_code);
-				AppendMsg(temp);
-				m_InterfaceSocket.Close();
-			}
-			return true;
-		}
-	}
 	KillTimer(1);
 
 	//发送GetAllRoom请求到interface
-	KVDataProtocolFactory factory;
-	ProtocolContext *context_tmp = new ProtocolContext;
-	ProtocolContext &context = *context_tmp;
-	unsigned int header_size, body_size;
-
-	context.type = DTYPE_BIN;
-	context.Info = "GetRoomList";
-
 	KVData kvdata(true);
 	kvdata.SetValue(KEY_Protocol, PRO_GetRoomList);
 	kvdata.SetValue(KEY_ClientID, m_UID);
 	kvdata.SetValue(KEY_ClientName, m_UName);
 
-	header_size = factory.HeaderSize();
-	body_size = kvdata.Size();
-	context.CheckSize(header_size+body_size);
-	kvdata.Serialize(context.Buffer+header_size);
-	context.Size = header_size+body_size;
-	factory.EncodeHeader(context.Buffer, body_size);
+	//序列化数据
+	KVDataProtocolFactory factory;
+	unsigned int header_size = factory.HeaderSize();
+	unsigned int body_size = kvdata.Size();
+	ProtocolContext *context = new ProtocolContext(header_size+body_size);
+	context->type = DTYPE_BIN;
+	context->Info = "GetRoomList";
+	kvdata.Serialize(context->Buffer+header_size);
+	context->Size = header_size+body_size;
+	factory.EncodeHeader(context->Buffer, body_size);
 
-	m_InterfaceSocket.m_SendContext = context_tmp;
-	m_InterfaceSocket.AsyncSelect(FD_WRITE|FD_CLOSE);
-
-	AppendMsg(_T("send GetRoomList request\r\n"));
+	SendProtocol(context, &m_InterfaceSocket);
+		
 	return true;
 }
 
@@ -322,60 +358,29 @@ bool CTractorGameDlg::OnGetRoomListRsp(KVData *kvdata)
 			m_RoomList.push_back(room_info);
 		}
 	}
-
-	if(m_CurStatus != Status_PrintRoomList)
-		return true;
-
 	m_RoomListCtrl.SetRedraw(FALSE);
 	m_RoomListCtrl.DeleteAllItems();
 	for(int i=0; i<m_RoomList.size(); ++i)
 	{
 		CString temp;
-		temp.Format(_T("房间[%2d] %d人"), i+1, m_RoomList[i].ClientNum);
-		m_RoomListCtrl.InsertItem(i, temp, 0);
+		temp.Format(_T("房间%d(%d人)"),i+1, m_RoomList[i].ClientNum);
+		m_RoomListCtrl.InsertItem(i, temp);
 	}
 	m_RoomListCtrl.SetRedraw(TRUE);
 
-	SetTimer(1, 5000, NULL);
+	if(RoomNum>0 && m_SelectRoomIndex<0)
+		m_SelectRoomIndex = 0;
+
+	SetTimer(1, 3000, NULL);
+
+	//请求房间地址
+	if(m_CurStatus==Status_PrintTableList && !m_RoomSocket.IsConnected && m_SelectRoomIndex>=0)
+		GetRoomAddrReq();
 	return true;
 }
 
 bool CTractorGameDlg::GetRoomAddrReq()
 {
-	AppendMsg(_T("GetRoomAddrReq\r\n"));
-	if(!m_InterfaceSocket.IsConnected)
-	{
-		//connect to interface
-		AppendMsg(_T("connect to game interface,wait please...\r\n"));
-
-		m_InterfaceSocket.Create();
-		if(TRUE==m_InterfaceSocket.Connect(INTERFACE_IP, 3000))
-		{
-			m_CurStatus = Status_PrintRoomList;
-			m_InterfaceSocket.IsConnected = TRUE;
-
-			AppendMsg(_T("connect game_interface successful.\r\n"));
-		}
-		else
-		{
-			uint32_t error_code = WSAGetLastError();
-			CString temp;
-			if(error_code == WSAEWOULDBLOCK)
-			{
-				temp.Format(_T("connect interface WouldBlock\r\n"));
-				AppendMsg(temp);
-				m_InterfaceSocket.AsyncSelect(FD_READ|FD_CONNECT);
-			}
-			else
-			{
-				temp.Format(_T("connect interface failed. error_code=%u\r\n"), error_code);
-				AppendMsg(temp);
-			}
-			return true;
-		}
-	}
-
-	AppendMsg(_T("send GetRoomAddrReq\r\n"));
 	assert(m_SelectRoomIndex>=0 && m_SelectRoomIndex<m_RoomList.size());
 	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
 
@@ -385,17 +390,19 @@ bool CTractorGameDlg::GetRoomAddrReq()
 	kvdata.SetValue(KEY_ClientID, m_UID);
 	kvdata.SetValue(KEY_ClientName, m_UName);
 
+	//序列化数据
 	KVDataProtocolFactory factory;
 	unsigned int header_size = factory.HeaderSize();
 	unsigned int body_size = kvdata.Size();
 	ProtocolContext *context = new ProtocolContext(header_size+body_size);
-
+	context->type = DTYPE_BIN;
+	context->Info = "GetRoomAddrReq";
 	kvdata.Serialize(context->Buffer+header_size);
 	context->Size = header_size+body_size;
 	factory.EncodeHeader(context->Buffer, body_size);
 
-	m_InterfaceSocket.m_SendContext = context;
-	m_InterfaceSocket.AsyncSelect(FD_WRITE|FD_CLOSE);
+	SendProtocol(context, &m_InterfaceSocket);
+
 	return true;
 }
 
@@ -416,41 +423,6 @@ bool CTractorGameDlg::OnGetRoomAddrRsp(KVData *kvdata)
 
 bool CTractorGameDlg::IntoRoomReq()
 {
-	AppendMsg(_T("IntoRoomReq\r\n"));
-	if(!m_RoomSocket.IsConnected)
-	{
-		//connect to interface
-		AppendMsg(_T("connect to game room,wait please...\r\n"));
-
-		assert(m_SelectRoomIndex>=0 && m_SelectRoomIndex<m_RoomList.size());
-		RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
-		CString IP(room_info.IP.c_str());
-		m_RoomSocket.Create();
-		if(TRUE==m_RoomSocket.Connect(IP, room_info.Port))
-		{
-			m_RoomSocket.IsConnected = TRUE;
-			AppendMsg(_T("connect game room successful.\r\n"));
-		}
-		else
-		{
-			uint32_t error_code = WSAGetLastError();
-			CString temp;
-			if(error_code == WSAEWOULDBLOCK)
-			{
-				temp.Format(_T("connect game room WouldBlock\r\n"));
-				AppendMsg(temp);
-				m_InterfaceSocket.AsyncSelect(FD_READ|FD_CONNECT);
-			}
-			else
-			{
-				temp.Format(_T("connect interface failed. error_code=%u\r\n"), error_code);
-				AppendMsg(temp);
-			}
-			return true;
-		}
-	}
-	//KillTimer(2);
-
 	AppendMsg(_T("send IntoRoom request\r\n"));
 	assert(m_SelectRoomIndex>=0 && m_SelectRoomIndex<m_RoomList.size());
 	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
@@ -465,13 +437,18 @@ bool CTractorGameDlg::IntoRoomReq()
 	unsigned int header_size = factory.HeaderSize();
 	unsigned int body_size = kvdata.Size();
 	ProtocolContext *context = new ProtocolContext(header_size+body_size);
+	context->type = DTYPE_BIN;
+	context->Info = "IntoRoom";
 
 	kvdata.Serialize(context->Buffer+header_size);
 	context->Size = header_size+body_size;
 	factory.EncodeHeader(context->Buffer, body_size);
 
-	m_RoomSocket.m_SendContext = context;
-	m_RoomSocket.AsyncSelect(FD_WRITE);
+	CString ip(room_info.IP.c_str());
+	m_RoomSocket.IP = ip;
+	m_RoomSocket.Port = room_info.Port;
+	SendProtocol(context, &m_RoomSocket);
+
 	return true;
 }
 
@@ -495,6 +472,8 @@ bool CTractorGameDlg::LeaveRoomReq()
 	unsigned int header_size = factory.HeaderSize();
 	unsigned int body_size = kvdata.Size();
 	ProtocolContext *context = new ProtocolContext(header_size+body_size);
+	context->type = DTYPE_BIN;
+	context->Info = "LeavRoom";
 
 	kvdata.Serialize(context->Buffer+header_size);
 	context->Size = header_size+body_size;
@@ -503,19 +482,6 @@ bool CTractorGameDlg::LeaveRoomReq()
 	m_RoomSocket.m_SendContext = context;
 	m_RoomSocket.AsyncSelect(FD_WRITE);
 	return true;
-}
-
-void CTractorGameDlg::PrintTableList()
-{
-	if(m_CurStatus != Status_PrintTableList)
-	{
-		AppendMsg(_T("Error:current status is [PrintTableList]\r\n"));
-		return ;
-	}
-
-	AppendMsg(_T("PrintTableList\r\n"));
-	if(!m_RoomSocket.IsConnected)
-		GetRoomAddrReq();
 }
 
 bool CTractorGameDlg::OnRoomInfoBroadCast(KVData *kvdata)
@@ -547,12 +513,10 @@ bool CTractorGameDlg::OnRoomInfoBroadCast(KVData *kvdata)
 	{
 		assert(m_SelectRoomIndex == RoomID);
 		CString temp;
-		temp.Format(_T("->房间[%02d] %d 人"), room_info.RoomID, room_info.ClientNum);
+		temp.Format(_T("房间[%02d] %d人"), room_info.RoomID, room_info.ClientNum);
 		GetDlgItem(IDC_STATIC_ROOM)->SetWindowText(temp);
 		InvalidateRect(m_TableRect);
 	}
-
-	//SetTimer(2, 2000, NULL);
 	return true;
 }
 
@@ -563,7 +527,7 @@ void CTractorGameDlg::OnAddGame()
 	if(!m_RoomSocket.IsConnected)
 	{
 		m_CurStatus = Status_PrintTableList;
-		PrintTableList();
+		IntoRoomReq();
 		return;
 	}
 
@@ -589,12 +553,7 @@ void CTractorGameDlg::OnAddGame()
 	context->Size = header_size+body_size;
 	factory.EncodeHeader(context->Buffer, body_size);
 	
-	m_RoomSocket.m_SendContext = context;
-	m_RoomSocket.AsyncSelect(FD_WRITE|FD_READ|FD_CLOSE);
-
-	CString temp;
-	temp.Format(_T("send AddGame request\r\n"));
-	AppendMsg(temp);
+	SendProtocol(context, &m_RoomSocket);
 }
 
 void CTractorGameDlg::OnTableInfoBroadCast(KVData *kvdata)
@@ -670,7 +629,7 @@ void CTractorGameDlg::QuitGameReq()
 	if(!m_RoomSocket.IsConnected)
 	{
 		m_CurStatus = Status_PrintTableList;
-		PrintTableList();
+		IntoRoomReq();
 		return;
 	}
 
@@ -768,22 +727,8 @@ void CTractorGameDlg::OnBnClickedLoad()
 	CString msg = _T("user sign in:uid=")+uid+_T(",uname=")+uname+_T("\r\n");
 	AppendMsg(msg);
 
-	PrintRoomList();
-}
-
-void CTractorGameDlg::OnStaticListClick()
-{
-	if(m_CurStatus == Status_PrintTableList)
-	{
-		//KillTimer(2);
-		GetDlgItem(IDC_STATIC_ROOM)->ShowWindow(SW_HIDE);
-		m_RoomListCtrl.ShowWindow(SW_NORMAL);
-
-		if(m_RoomSocket.IsConnected)
-			LeaveRoomReq();
-		m_CurStatus = Status_PrintRoomList;
-		PrintRoomList();
-	}
+	//请求房间列表
+	GetRoomListReq();
 }
 
 void CTractorGameDlg::OnStaticRoomClick()
@@ -807,13 +752,8 @@ void CTractorGameDlg::OnTimer(UINT_PTR nIDEvent)
 	// TODO: 在此添加消息处理程序代码和/或调用默认值
 	if(nIDEvent == 1)  //打印房间列表
 	{
-		AppendMsg(_T("PrintRoomList\r\n"));
-		PrintRoomList();
-	}
-	else if(nIDEvent == 2)  //打印房间信息
-	{
-		AppendMsg(_T("PrintTableList\r\n"));
-		PrintTableList();
+		AppendMsg(_T("Timer:GetRoomListReq\r\n"));
+		GetRoomListReq();
 	}
 	CDialog::OnTimer(nIDEvent);
 }
@@ -829,18 +769,22 @@ void CTractorGameDlg::OnNMDblclkRoomlist(NMHDR *pNMHDR, LRESULT *pResult)
 		temp.Format(_T("OnDBClick. Into Room[%d]\r\n"), index);
 		AppendMsg(temp);
 
-		KillTimer(1);
-		m_SelectRoomIndex = index;
-		m_RoomListCtrl.ShowWindow(SW_HIDE);
-
-		temp.Format(_T("->房间[%02d]"), index+1);
+		temp.Format(_T("房间[%02d]"), index+1);
 		GetDlgItem(IDC_STATIC_ROOM)->SetWindowText(temp);
-		GetDlgItem(IDC_STATIC_ROOM)->ShowWindow(SW_NORMAL);
-		//m_TableListCtrl.ShowWindow(SW_NORMAL);
 
-		
-		m_CurStatus = Status_PrintTableList;
-		PrintTableList();
+		if(m_SelectRoomIndex != index)  //选了另外的一个房间
+		{
+			CString msg;
+			msg.Format(_T("select another room=%d\r\n"), index);
+			AppendMsg(msg);
+
+			//LeaveRoomReq();
+			if(m_RoomSocket.IsConnected)  //直接关掉让服务器处理对应的事件
+				m_RoomSocket.Close();
+			m_CurStatus = Status_PrintTableList;
+			m_SelectRoomIndex = index;
+			GetRoomAddrReq();
+		}
 	}
 
 	*pResult = 0;
@@ -856,9 +800,8 @@ void CTractorGameDlg::OnPaint_TableList(CRect &client_rect)
 
 	CPen *old_pen;
 	CRect rect, draw_rect;
-	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
 
-	//画外框
+	//画背景
 	CBrush gb_brush(&m_BgBmp);
 	CBrush *old_brush = dc.SelectObject(&gb_brush);
 	dc.Rectangle(&client_rect);
@@ -878,6 +821,10 @@ void CTractorGameDlg::OnPaint_TableList(CRect &client_rect)
 	rect.top = client_rect.top+2;
 	rect.bottom = client_rect.bottom-2;
 
+	if(m_RoomList.size() == 0)
+		return ;
+		
+	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
 	//画滚动条
 	int RowNum = room_info.TableArray.size()/TABLE_NUM+(room_info.TableArray.size()%TABLE_NUM>0?1:0);  //行数
 	int ViewHeight = RowNum*HEIGHT+(RowNum-1)*PADDING;  //总的高度
@@ -1066,27 +1013,9 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 		else
 			dc.Ellipse(&draw_rect);
 
-		if(pos == 0)
-			x += 25;
-		else if(pos == 1)
-			y += 25;
-		else if(pos == 2)
-			x -= 50;
-		else if(pos == 3)
-			y -= 40;
 		CString lable, poker;
-
 		lable.Format(_T("uid[%d]:"), m_PlayerStatus[i].client_id);
 		lable += StatusStr[m_PlayerStatus[i].status];
-
-		for(int npoker=0; npoker<m_PlayerStatus[i].poker.size(); ++npoker)
-		{
-			if(m_PlayerStatus[i].poker[npoker] < 0)
-				poker.Format(_T("*,"));
-			else
-				poker.Format(_T("%d,"), m_PlayerStatus[i].poker[npoker]);
-			lable += poker;
-		}
 		if(pos==3 && m_MyStatus>1)
 		{
 			COLORREF old_color = dc.GetTextColor();
@@ -1094,8 +1023,72 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 			dc.TextOut(x, y, lable, lable.GetLength());
 			dc.SetTextColor(old_color);
 		}
-		else\
+		else
 			dc.TextOut(x, y, lable, lable.GetLength());
+
+		//画扑克
+
+		CRect poker_rect;
+		if(m_PlayerStatus[i].poker.size() > 0)
+		{
+			int poker_width = 0;
+			int poker_height = 0;
+			if(pos == 0 || pos ==2)
+			{
+				poker_width = 140;
+				poker_height = (m_PlayerStatus[i].poker.size()-1)*18+100;
+				poker_rect.top = y-poker_height/2;
+				poker_rect.left = pos==0?x+40:x-140;
+				poker_rect.bottom = poker_rect.top+100;
+				poker_rect.right = poker_rect.left+140;
+			}
+			else
+			{
+				poker_height = 140;
+				poker_width = (m_PlayerStatus[i].poker.size()-1)*18+100;
+				poker_rect.left = x-poker_width/2;
+				poker_rect.top = pos==1?y+40:y-140;
+				poker_rect.bottom = poker_rect.top+140;
+				poker_rect.right = poker_rect.left+100;
+			}
+
+			if(pos == 3)
+			{
+				CDC MemDC_BgMask;
+				MemDC_BgMask.CreateCompatibleDC(&dc);
+				MemDC_BgMask.SelectObject(&m_BgMaskBmp);
+
+				for(int npoker=0; npoker<m_PlayerStatus[i].poker.size(); ++npoker)
+				{
+					dc.BitBlt(poker_rect.left, poker_rect.top, poker_rect.Width(),poker_rect.Height(), &MemDC_BgMask, 0,0,SRCAND);
+
+					CBitmap BgBmp;
+					BgBmp.CreateCompatibleBitmap(&dc, 100, 140);
+
+					CDC MemDC;
+					MemDC.CreateCompatibleDC(&dc);
+					MemDC.SelectObject(&BgBmp);
+
+					CDC MemDC_FtMask;
+					MemDC_FtMask.CreateCompatibleDC(&dc);
+					MemDC_FtMask.SelectObject(&m_FtMaskBmp);
+					MemDC.BitBlt(0,0,100,140, &MemDC_FtMask, 0, 0, SRCCOPY);
+
+					CDC MemDC_Front;
+					MemDC_Front.CreateCompatibleDC(&dc);
+					MemDC_Front.SelectObject(&m_PokerBmp[m_PlayerStatus[i].poker[npoker]]);
+					CString msg;
+					msg.Format(_T("%d,"), m_PlayerStatus[i].poker[npoker]);
+					AppendMsg(msg);
+					MemDC.BitBlt(0,0,100,140, &MemDC_Front, 0, 0, SRCAND);
+
+					dc.BitBlt(poker_rect.left, poker_rect.top, poker_rect.Width(),poker_rect.Height(), &MemDC, 0,0,SRCPAINT);
+
+					poker_rect.left+=18;
+					poker_rect.right += 18;
+				}
+			}
+		}
 	}
 
 	//画旁观者
@@ -1169,7 +1162,8 @@ void CTractorGameDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
 			&&point.y>=m_TableRect.top+2&&point.y<m_TableRect.bottom-2)
 		{
 			//转换点在table中的逻辑坐标
-			int y_offset = m_VScrollBarYOffset*(m_TableRect.Height()-4)/m_VScrollBarHeight;
+
+			int y_offset = m_VScrollBarHeight>0?m_VScrollBarYOffset*(m_TableRect.Height()-4)/m_VScrollBarHeight:0;
 			int y = point.y-(m_TableRect.top+2)+y_offset;
 			int x =  point.x-(m_TableRect.left+2)-m_TableRectXOffset;
 
@@ -1208,7 +1202,7 @@ void CTractorGameDlg::OnBnClickedStartgame()
 	if(!m_RoomSocket.IsConnected)
 	{
 		m_CurStatus = Status_PrintTableList;
-		PrintTableList();
+		IntoRoomReq();
 		return;
 	}
 
@@ -1247,9 +1241,8 @@ void CTractorGameDlg::OnBnClickedAddgame()
 	if(!m_RoomSocket.IsConnected)
 	{
 		m_CurStatus = Status_PrintTableList;
-		PrintTableList();
-		return;
+		IntoRoomReq();
 	}
-
-	OnAddGame();
+	else
+		OnAddGame();
 }

@@ -8,6 +8,24 @@
 #include "KeyDefine.h"
 #include "TractorGameDlg.h"
 
+void CGameSocket::OnConnect(int nErrorCode)
+{
+	CTractorGameApp* pApp= (CTractorGameApp*)AfxGetApp();
+	CTractorGameDlg* pDlg= (CTractorGameDlg*)pApp->m_pMainWnd;
+
+	if(nErrorCode == 0)
+	{
+		pDlg->AppendMsg(_T("connect to server successfu.\r\n"));
+		IsConnected = TRUE;
+		AsyncSelect(FD_WRITE|FD_READ|FD_CLOSE);
+	}
+	else
+	{
+		pDlg->AppendMsg(_T("connect to server failed.\r\n"));
+		Close();
+	}
+}
+
 // CGameSocket
 uint32_t CGameSocket::RecvProtocol(ProtocolContext &context)
 {
@@ -45,33 +63,43 @@ uint32_t CGameSocket::RecvProtocol(ProtocolContext &context)
 
 void CGameSocket::OnReceive(int nErrorCode)
 {
+	CTractorGameApp* pApp= (CTractorGameApp*)AfxGetApp();
+	CTractorGameDlg* pDlg= (CTractorGameDlg*)pApp->m_pMainWnd;
+
 	ProtocolContext context;
 	if(RecvProtocol(context) < 0)
 	{
-		IsConnected = FALSE;
 		Close();
-		CTractorGameApp* pApp= (CTractorGameApp*)AfxGetApp();
-		CTractorGameDlg* pDlg= (CTractorGameDlg*)pApp->m_pMainWnd;
-
+		IsConnected = FALSE;
+		
 		CString msg(_T("OnReceive error. close socket now."));
 		pDlg->AppendMsg(msg);
 	}
 	else
 	{
-		OnReceiveProtocol((KVData*)context.protocol);
+		pDlg->OnReceiveProtocol((KVData*)context.protocol);
 		KVDataProtocolFactory factory;
 		factory.DeleteProtocol(0, context.protocol);
-
 		AsyncSelect(FD_READ|FD_CLOSE);
 	}
 }
 
 void CGameSocket::OnSend(int nErrorCode)
 {
-	if(m_SendContext == NULL)
-		return ;
+	CTractorGameApp* pApp= (CTractorGameApp*)AfxGetApp();
+	CTractorGameDlg* pDlg= (CTractorGameDlg*)pApp->m_pMainWnd;
 
-	uint32_t send_size = 0;
+	if(m_SendContext == NULL)
+	{
+		pDlg->AppendMsg(_T("Socket OnSend, but context is NULL.\r\n"));
+		return ;
+	}
+
+	CString msg(m_SendContext->Info.c_str());
+	msg += ": OnSend\r\n";
+	pDlg->AppendMsg(msg);
+
+	uint32_t send_size = m_SendContext->send_size;
 	while(send_size < m_SendContext->Size)
 	{
 		int ret = Send(m_SendContext->Buffer, m_SendContext->Size-send_size, 0);
@@ -79,11 +107,8 @@ void CGameSocket::OnSend(int nErrorCode)
 			send_size += ret;
 		else if(WSAGetLastError() != WSAEWOULDBLOCK)
 		{
-			IsConnected = FALSE;
 			Close();
-
-			CTractorGameApp* pApp= (CTractorGameApp*)AfxGetApp();
-			CTractorGameDlg* pDlg= (CTractorGameDlg*)pApp->m_pMainWnd;
+			IsConnected = FALSE;
 
 			CString msg(m_SendContext->Info.c_str());
 			msg += _T(":OnSend error. close socket now");
@@ -100,82 +125,10 @@ void CGameSocket::OnSend(int nErrorCode)
 
 void CGameSocket::OnClose(int nErrorCode)
 {
+	Close();
+	IsConnected = FALSE;
+
 	CTractorGameApp* pApp= (CTractorGameApp*)AfxGetApp();
 	CTractorGameDlg* pDlg= (CTractorGameDlg*)pApp->m_pMainWnd;
 	pDlg->AppendMsg(_T("server close socket.\r\n"));
-
-	IsConnected = FALSE;
-	Close();
-}
-
-// CInterfaceSocket
-void CInterfaceSocket::OnConnect(int nErrorCode)
-{
-	CTractorGameApp* pApp= (CTractorGameApp*)AfxGetApp();
-	CTractorGameDlg* pDlg= (CTractorGameDlg*)pApp->m_pMainWnd;
-
-	if(nErrorCode == 0)
-	{
-		IsConnected = TRUE;
-		pDlg->AppendMsg(_T("connect game interface successful.\r\n"));
-		if(pDlg->m_CurStatus == Status_PrintRoomList)
-			pDlg->PrintRoomList();
-		else if(pDlg->m_CurStatus == Status_PrintTableList)
-			pDlg->GetRoomAddrReq();
-		else
-			pDlg->AppendMsg(_T("connect game interface succssful, but in error status.\r\n"));
-	}
-	else
-		pDlg->AppendMsg(_T("connect game interface failed.\r\n"));
-}
-
-void CInterfaceSocket::OnReceiveProtocol( KVData *kvdata)
-{
-	CTractorGameApp* pApp= (CTractorGameApp*)AfxGetApp();
-	CTractorGameDlg* pDlg= (CTractorGameDlg*)pApp->m_pMainWnd;
-
-	int Protocol;
-	kvdata->GetValue(KEY_Protocol, Protocol);
-	if(Protocol == PRO_GetRoomListRsp)
-		pDlg->OnGetRoomListRsp(kvdata);
-	else if(Protocol == PRO_GetRoomAddrRsp)
-		pDlg->OnGetRoomAddrRsp(kvdata);
-	else
-		assert(0);
-}
-
-
-// CRoomSocket
-void CRoomSocket::OnConnect(int nErrorCode)
-{
-	CTractorGameApp* pApp= (CTractorGameApp*)AfxGetApp();
-	CTractorGameDlg* pDlg= (CTractorGameDlg*)pApp->m_pMainWnd;
-
-	if(nErrorCode == 0)
-	{
-		IsConnected = TRUE;
-		if(pDlg->m_CurStatus == Status_PrintTableList)
-			pDlg->IntoRoomReq();
-		else
-			pDlg->AppendMsg(_T("connect game room succssful, but in error status.\r\n"));
-	}
-	else
-		pDlg->AppendMsg(_T("connect game interface failed.\r\n"));
-}
-
-void CRoomSocket::OnReceiveProtocol(KVData *kvdata)
-{
-	CTractorGameApp* pApp= (CTractorGameApp*)AfxGetApp();
-	CTractorGameDlg* pDlg= (CTractorGameDlg*)pApp->m_pMainWnd;
-
-	int Protocol;
-	kvdata->GetValue(KEY_Protocol, Protocol);
-	if(Protocol == PRO_RoomInfoBroadCast)
-		pDlg->OnRoomInfoBroadCast(kvdata);
-	else if(Protocol == PRO_TableInfoBroadCast)
-		pDlg->OnTableInfoBroadCast(kvdata);
-	else if(Protocol == PRO_DealPoker)
-		pDlg->OnDealPoker(kvdata);
-	else
-		assert(0);
 }
