@@ -15,8 +15,8 @@ using namespace easynet;
 #define new DEBUG_NEW
 #endif
 
-//#define INTERFACE_IP  _T("192.168.80.130")
-#define INTERFACE_IP  _T("192.168.179.129")
+#define INTERFACE_IP  _T("192.168.80.130")
+//#define INTERFACE_IP  _T("192.168.179.129")
 
 #define TABLE_NUM             6       //一行显示桌子数
 #define HEIGHT                      100  //桌子高
@@ -1052,6 +1052,7 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 				poker_rect.right = poker_rect.left+100;
 			}
 
+			/*
 			if(pos == 3)
 			{
 				CDC MemDC_BgMask;
@@ -1084,6 +1085,15 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 
 					dc.BitBlt(poker_rect.left, poker_rect.top, poker_rect.Width(),poker_rect.Height(), &MemDC, 0,0,SRCPAINT);
 
+					poker_rect.left+=18;
+					poker_rect.right += 18;
+				}
+			}*/
+			if(pos == 3)
+			{
+				for(int npoker=0; npoker<m_PlayerStatus[i].poker.size(); ++npoker)
+				{
+					DrawPoker(&dc, poker_rect, &m_PokerBmp[m_PlayerStatus[i].poker[npoker]]);
 					poker_rect.left+=18;
 					poker_rect.right += 18;
 				}
@@ -1255,7 +1265,7 @@ void CTractorGameDlg::DrawPoker(CDC *dc, CRect &rect, CBitmap *poker_bitmap)
 	old_bitmap = mem_dc.SelectObject(poker_bitmap);
 
 	//3. 绘图
-	dc.TransparentBlt(rect.left, rect.top, rect.Width(), rect.Height(), &  mem_dc , 0, 0, 100, 100,  RGB(255,0,255) );
+	dc->TransparentBlt(rect.left, rect.top, rect.Width(), rect.Height(), &  mem_dc , 0, 0, 100, 140,  RGB(255,0,255) );
 
 	//4. 恢复
 	mem_dc.SelectObject( old_bitmap);
