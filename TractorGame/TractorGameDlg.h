@@ -139,4 +139,6 @@ public:
 	CBitmap m_FtMaskBmp;
 	CBitmap m_HBackBmp;  //扑克背面(横)
 	CBitmap m_VBackBmp;  //扑克背面(竖)
+
+	void DrawPoker(CDC *dc, CRect &rect, CBitmap *poker_bitmap);
 };

@@ -1246,3 +1246,17 @@ void CTractorGameDlg::OnBnClickedAddgame()
 	else
 		OnAddGame();
 }
+
+void CTractorGameDlg::DrawPoker(CDC *dc, CRect &rect, CBitmap *poker_bitmap)
+{
+	CBitmap *old_bitmap;
+	CDC mem_dc;
+	mem_dc.CreateCompatibleDC(dc);
+	old_bitmap = mem_dc.SelectObject(poker_bitmap);
+
+	//3. »æÍ¼
+	dc.TransparentBlt(rect.left, rect.top, rect.Width(), rect.Height(), &  mem_dc , 0, 0, 100, 100,  RGB(255,0,255) );
+
+	//4. »Ö¸´
+	mem_dc.SelectObject( old_bitmap);
+}
