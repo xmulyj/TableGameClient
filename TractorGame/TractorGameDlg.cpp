@@ -371,7 +371,7 @@ bool CTractorGameDlg::OnGetRoomListRsp(KVData *kvdata)
 	if(RoomNum>0 && m_SelectRoomIndex<0)
 		m_SelectRoomIndex = 0;
 
-	SetTimer(1, 3000, NULL);
+	//SetTimer(1, 3000, NULL);
 
 	//请求房间地址
 	if(m_CurStatus==Status_PrintTableList && !m_RoomSocket.IsConnected && m_SelectRoomIndex>=0)
@@ -691,7 +691,18 @@ void CTractorGameDlg::OnDealPoker(KVData *kvdata)
 		if(m_PlayerStatus[i].client_id==m_UID)
 		{
 			for(int j=0; j<CardNum; j++)
+			{
 				m_PlayerStatus[i].poker.push_back(poker[j]);
+				int pos = m_PlayerStatus[i].poker.size()-1;
+				while(pos > 0)
+				{
+					if( poker[j] <= m_PlayerStatus[i].poker[pos-1])
+						break;
+					m_PlayerStatus[i].poker[pos] = m_PlayerStatus[i].poker[pos-1];
+					--pos;
+				}	
+				m_PlayerStatus[i].poker[pos] = poker[j];
+			}
 		}
 		else
 			m_PlayerStatus[i].poker.push_back(-1);
@@ -1094,8 +1105,8 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 				for(int npoker=0; npoker<m_PlayerStatus[i].poker.size(); ++npoker)
 				{
 					DrawPoker(&dc, poker_rect, &m_PokerBmp[m_PlayerStatus[i].poker[npoker]]);
-					poker_rect.left+=18;
-					poker_rect.right += 18;
+					poker_rect.left+=16;
+					poker_rect.right += 16;
 				}
 			}
 		}
