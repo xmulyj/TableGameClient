@@ -266,10 +266,14 @@ void CTractorGameDlg::OnPaint()
 	{
 		if(m_CurStatus == Status_PrintTableList)
 		{
+			AppendMsg(_T("Status_PrintTableList\r\n"));
 			OnPaint_TableList(m_TableRect);
 		}
 		else if(m_CurStatus == Status_Playing)
+		{
+			AppendMsg(_T("Status_Playing\r\n"));
 			OnPaint_Talbe(m_TableRect);
+		}
 		else
 			CDialog::OnPaint();
 	}
@@ -342,7 +346,7 @@ bool CTractorGameDlg::OnGetRoomListRsp(KVData *kvdata)
 
 	AppendMsg(_T("OnGetRoomListRsp\r\n"));
 	kvdata->GetValue(KEY_RoomNum, RoomNum);
-	m_RoomList.clear();
+	m_RoomList.clear();    //应该上锁的,否则画图的时候取出对于的room_info会有问题
 	if(RoomNum > 0)
 	{
 		uint32_t size;
@@ -368,25 +372,28 @@ bool CTractorGameDlg::OnGetRoomListRsp(KVData *kvdata)
 	}
 	m_RoomListCtrl.SetRedraw(TRUE);
 
-	if(RoomNum>0 && m_SelectRoomIndex<0)
-		m_SelectRoomIndex = 0;
 
-	//SetTimer(1, 3000, NULL);
+	if(RoomNum>0 && m_SelectRoomIndex==-1)
+	{
+		m_SelectRoomIndex = 0;
+		m_SelectRoom = m_RoomList[0];
+	}
+
+	SetTimer(1, 3000, NULL);
 
 	//请求房间地址
-	if(m_CurStatus==Status_PrintTableList && !m_RoomSocket.IsConnected && m_SelectRoomIndex>=0)
+	if(m_CurStatus==Status_PrintTableList && !m_RoomSocket.IsConnected &&  m_SelectRoomIndex>=0)
 		GetRoomAddrReq();
 	return true;
 }
 
 bool CTractorGameDlg::GetRoomAddrReq()
 {
-	assert(m_SelectRoomIndex>=0 && m_SelectRoomIndex<m_RoomList.size());
-	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
+	assert(m_SelectRoomIndex>=0 &&  m_SelectRoomIndex<m_RoomList.size());
 
 	KVData kvdata(true);
 	kvdata.SetValue(KEY_Protocol, PRO_GetRoomAddr);
-	kvdata.SetValue(KEY_RoomID, room_info.RoomID);
+	kvdata.SetValue(KEY_RoomID, m_SelectRoom.RoomID);
 	kvdata.SetValue(KEY_ClientID, m_UID);
 	kvdata.SetValue(KEY_ClientName, m_UName);
 
@@ -411,10 +418,9 @@ bool CTractorGameDlg::OnGetRoomAddrRsp(KVData *kvdata)
 	AppendMsg(_T("OnGetRoomAddrRsp\r\n"));
 	int RoomID = -1;
 	kvdata->GetValue(KEY_RoomID, RoomID);
-	assert(RoomID>=0 && RoomID<m_RoomList.size());
-	RoomInfo &room_info = m_RoomList[RoomID];
-	kvdata->GetValue(KEY_RoomIP, room_info.IP);
-	kvdata->GetValue(KEY_RoomPort, room_info.Port);
+	assert(RoomID>=0 && RoomID==m_SelectRoom.RoomID);
+	kvdata->GetValue(KEY_RoomIP, m_SelectRoom.IP);
+	kvdata->GetValue(KEY_RoomPort, m_SelectRoom.Port);
 
 	if(m_CurStatus == Status_PrintTableList)
 		IntoRoomReq();
@@ -425,11 +431,10 @@ bool CTractorGameDlg::IntoRoomReq()
 {
 	AppendMsg(_T("send IntoRoom request\r\n"));
 	assert(m_SelectRoomIndex>=0 && m_SelectRoomIndex<m_RoomList.size());
-	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
 
 	KVData kvdata(true);
 	kvdata.SetValue(KEY_Protocol, PRO_IntoRoom);
-	kvdata.SetValue(KEY_RoomID, room_info.RoomID);
+	kvdata.SetValue(KEY_RoomID, m_SelectRoom.RoomID);
 	kvdata.SetValue(KEY_ClientID, m_UID);
 	kvdata.SetValue(KEY_ClientName, m_UName);
 
@@ -444,9 +449,9 @@ bool CTractorGameDlg::IntoRoomReq()
 	context->Size = header_size+body_size;
 	factory.EncodeHeader(context->Buffer, body_size);
 
-	CString ip(room_info.IP.c_str());
+	CString ip(m_SelectRoom.IP.c_str());
 	m_RoomSocket.IP = ip;
-	m_RoomSocket.Port = room_info.Port;
+	m_RoomSocket.Port = m_SelectRoom.Port;
 	SendProtocol(context, &m_RoomSocket);
 
 	return true;
@@ -460,11 +465,10 @@ bool CTractorGameDlg::LeaveRoomReq()
 	//KillTimer(2);
 	AppendMsg(_T("send LeaveRoomReq request\r\n"));
 	assert(m_SelectRoomIndex>=0 && m_SelectRoomIndex<m_RoomList.size());
-	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
 
 	KVData kvdata(true);
 	kvdata.SetValue(KEY_Protocol, PRO_LeaveRoom);
-	kvdata.SetValue(KEY_RoomID, room_info.RoomID);
+	kvdata.SetValue(KEY_RoomID, m_SelectRoom.RoomID);
 	kvdata.SetValue(KEY_ClientID, m_UID);
 	kvdata.SetValue(KEY_ClientName, m_UName);
 
@@ -491,21 +495,23 @@ bool CTractorGameDlg::OnRoomInfoBroadCast(KVData *kvdata)
 	unsigned int size;
 	char *NumArray;
 
-	AppendMsg(_T("OnRoomInfoBroadCast\r\n"));
-
 	kvdata->GetValue(KEY_RoomID, RoomID);
-	RoomInfo &room_info = m_RoomList[RoomID];
-	assert(room_info.RoomID == RoomID);
+	assert(m_SelectRoom.RoomID == RoomID);
 
-	kvdata->GetValue(KEY_ClientNum, room_info.ClientNum);
+	kvdata->GetValue(KEY_ClientNum, m_SelectRoom.ClientNum);
 	kvdata->GetValue(KEY_TableNum, TableNum);
-	kvdata->GetValue(KEY_NeedNum, room_info.NeedNum);
+	kvdata->GetValue(KEY_NeedNum, m_SelectRoom.NeedNum);
 	kvdata->GetValue(KEY_Array, NumArray, size);
 	assert(size == sizeof(int)*TableNum);
-	room_info.TableArray.clear();
+
+	CString msg;
+	msg.Format(_T("OnRoomInfoBroadCast. RoomID=%d, NeedNum=%d, CurStat=%d\r\n"), RoomID, m_SelectRoom.NeedNum, m_CurStatus);
+	AppendMsg(msg);
+
+	m_SelectRoom.TableArray.clear();
 	for(int i=0; i<TableNum; ++i)
 	{
-		room_info.TableArray.push_back(ntohl(*(int*)NumArray));
+		m_SelectRoom.TableArray.push_back(ntohl(*(int*)NumArray));
 		NumArray += sizeof(int);
 	}
 
@@ -513,10 +519,11 @@ bool CTractorGameDlg::OnRoomInfoBroadCast(KVData *kvdata)
 	{
 		assert(m_SelectRoomIndex == RoomID);
 		CString temp;
-		temp.Format(_T("房间[%02d] %d人"), room_info.RoomID, room_info.ClientNum);
+		temp.Format(_T("房间[%02d] %d人"), m_SelectRoom.RoomID, m_SelectRoom.ClientNum);
 		GetDlgItem(IDC_STATIC_ROOM)->SetWindowText(temp);
 		InvalidateRect(m_TableRect);
 	}
+
 	return true;
 }
 
@@ -532,12 +539,11 @@ void CTractorGameDlg::OnAddGame()
 	}
 
 	assert(m_SelectRoomIndex>=0 && m_SelectRoomIndex<m_RoomList.size());
-	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
 
 	//Send AddGame request
 	KVData kvdata(true);
 	kvdata.SetValue(KEY_Protocol, PRO_AddGame);
-	kvdata.SetValue(KEY_RoomID, room_info.RoomID);
+	kvdata.SetValue(KEY_RoomID, m_SelectRoom.RoomID);
 	kvdata.SetValue(KEY_TableID, m_SelectTableIndex);
 	kvdata.SetValue(KEY_ClientID, m_UID);
 	kvdata.SetValue(KEY_ClientName, m_UName);
@@ -634,12 +640,11 @@ void CTractorGameDlg::QuitGameReq()
 	}
 
 	assert(m_SelectRoomIndex>=0 && m_SelectRoomIndex<m_RoomList.size());
-	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
 
 	//Send AddGame request
 	KVData kvdata(true);
 	kvdata.SetValue(KEY_Protocol, PRO_QuitGame);
-	kvdata.SetValue(KEY_RoomID, room_info.RoomID);
+	kvdata.SetValue(KEY_RoomID, m_SelectRoom.RoomID);
 	kvdata.SetValue(KEY_TableID, m_SelectTableIndex);
 	kvdata.SetValue(KEY_ClientID, m_UID);
 	kvdata.SetValue(KEY_ClientName, m_UName);
@@ -666,8 +671,6 @@ void CTractorGameDlg::QuitGameReq()
 
 void CTractorGameDlg::OnDealPoker(KVData *kvdata)
 {
-	AppendMsg(_T("OnDealPoker\r\n"));
-
 	int CardFlag = -1;
 	char *Array = NULL;
 	uint32_t size;
@@ -686,10 +689,12 @@ void CTractorGameDlg::OnDealPoker(KVData *kvdata)
 			poker[i] = ntohl(ppoker[i]);
 	}
 
+	int my_index = 0;
 	for(int i=0; i<m_PlayerStatus.size(); ++i)
 	{
 		if(m_PlayerStatus[i].client_id==m_UID)
 		{
+			my_index = i;
 			for(int j=0; j<CardNum; j++)
 			{
 				m_PlayerStatus[i].poker.push_back(poker[j]);
@@ -709,6 +714,10 @@ void CTractorGameDlg::OnDealPoker(KVData *kvdata)
 	}
 
 	InvalidateRect(&m_TableRect);
+
+	CString msg;
+	msg.Format(_T("OnDealPoker:cur Poker=%u\r\n"), m_PlayerStatus[my_index].poker.size());
+	AppendMsg(msg);
 }
 
 void CTractorGameDlg::OnBnClickedLoad()
@@ -832,12 +841,11 @@ void CTractorGameDlg::OnPaint_TableList(CRect &client_rect)
 	rect.top = client_rect.top+2;
 	rect.bottom = client_rect.bottom-2;
 
-	if(m_RoomList.size() == 0)
+	if(m_SelectRoomIndex<0)
 		return ;
-		
-	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
+
 	//画滚动条
-	int RowNum = room_info.TableArray.size()/TABLE_NUM+(room_info.TableArray.size()%TABLE_NUM>0?1:0);  //行数
+	int RowNum = m_SelectRoom.TableArray.size()/TABLE_NUM+(m_SelectRoom.TableArray.size()%TABLE_NUM>0?1:0);  //行数
 	int ViewHeight = RowNum*HEIGHT+(RowNum-1)*PADDING;  //总的高度
 	if(ViewHeight > rect.Height())  //有滚动条
 	{
@@ -867,7 +875,7 @@ void CTractorGameDlg::OnPaint_TableList(CRect &client_rect)
 	dc.SelectStockObject(NULL_PEN);
 	CBrush brush(RGB(255, 200, 0));
 	dc.SelectObject(&brush);
-	for(int i=0; i<room_info.TableArray.size(); ++i)
+	for(int i=0; i<m_SelectRoom.TableArray.size(); ++i)
 	{
 		CRect player_rect;
 		dc.BitBlt(draw_rect.left, draw_rect.top, draw_rect.Width(), draw_rect.Width(), &MemDc, 0, 0, SRCCOPY);
@@ -876,9 +884,9 @@ void CTractorGameDlg::OnPaint_TableList(CRect &client_rect)
 		lable.Format(_T("%d"), i+1);
 		dc.TextOut((draw_rect.left+draw_rect.right)/2,(draw_rect.top+draw_rect.bottom)/2, lable, lable.GetLength());
 
-		int PlayerArray = room_info.TableArray[i];
+		int PlayerArray = m_SelectRoom.TableArray[i];
 
-		for(int j=0; j<room_info.NeedNum; ++j)
+		for(int j=0; j<m_SelectRoom.NeedNum; ++j)
 		{
 			if((PlayerArray & (1<<j)) == 0)
 				continue;
@@ -968,7 +976,6 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 	CBrush brush(RGB(255, 200, 0));	
 	dc.SelectObject(&brush);
 
-	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
 	int i, index = -1;
 	for(i=0; i<m_PlayerStatus.size(); ++i)
 	{
@@ -980,14 +987,18 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 	}
 	int delta = 0;
 	if(index != -1)
-		delta = (room_info.NeedNum-1)-index;   // 玩家自己的位置顺时针移动的个数,以便显示在下面的位置
+		delta = (m_SelectRoom.NeedNum-1)-index;   // 玩家自己的位置顺时针移动的个数,以便显示在下面的位置
 	int x, y;
+
+	CString msg;
+	msg.Format(_T("my_index=%d, needNum=%d, delta=%d\r\n"), index, m_SelectRoom.NeedNum, delta);
+	AppendMsg(msg);
 
 	CString StatusStr[4]={_T("UnKnow"),_T("Audience"),_T("Wait"), _T("Playing")};
 
 	for(i=0; i<m_PlayerStatus.size(); ++i)
 	{
-		int pos = (i+delta)%room_info.NeedNum;
+		int pos = (i+delta)%m_SelectRoom.NeedNum;
 		if(pos == 0)
 		{
 			x = rect.left+20;
@@ -1227,13 +1238,12 @@ void CTractorGameDlg::OnBnClickedStartgame()
 		return;
 	}
 
-	assert(m_SelectRoomIndex>=0 && m_SelectRoomIndex<m_RoomList.size());
-	RoomInfo &room_info = m_RoomList[m_SelectRoomIndex];
+	assert(m_SelectRoomIndex>=0 && m_SelectRoom.RoomID>=0);
 
 	//Send AddGame request
 	KVData kvdata(true);
 	kvdata.SetValue(KEY_Protocol, PRO_StartGame);
-	kvdata.SetValue(KEY_RoomID, room_info.RoomID);
+	kvdata.SetValue(KEY_RoomID, m_SelectRoom.RoomID);
 	kvdata.SetValue(KEY_TableID, m_SelectTableIndex);
 	kvdata.SetValue(KEY_ClientID, m_UID);
 	kvdata.SetValue(KEY_ClientName, m_UName);

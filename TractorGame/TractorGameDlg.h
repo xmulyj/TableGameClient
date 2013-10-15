@@ -98,10 +98,12 @@ public:
 public:
 	int m_UID;
 	string m_UName;
+
 	int m_SelectRoomIndex;
 	int m_SelectTableIndex;
 
 	vector<RoomInfo> m_RoomList;
+	RoomInfo m_SelectRoom;
 
 	vector<TableStatus> m_PlayerStatus;
 	vector<TableStatus> m_AudienceStatus;
