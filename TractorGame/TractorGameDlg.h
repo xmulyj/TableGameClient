@@ -93,8 +93,8 @@ public:
 	void OnAddGame();
 	void QuitGameReq();
 	void OnDealPoker(KVData *kvdata);
-	void OnTableInfoBroadCast(KVData *kvdata);
-
+	void OnAddGameRsp(KVData *kvdata);
+	void OnAddGameBroadCast(KVData *kvdata);
 public:
 	int m_UID;
 	string m_UName;

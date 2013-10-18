@@ -15,7 +15,7 @@ using namespace easynet;
 #define new DEBUG_NEW
 #endif
 
-#define INTERFACE_IP  _T("192.168.80.130")
+#define INTERFACE_IP  _T("192.168.80.132")
 //#define INTERFACE_IP  _T("192.168.179.129")
 
 #define TABLE_NUM             6       //一行显示桌子数
@@ -305,8 +305,10 @@ void CTractorGameDlg::OnReceiveProtocol(KVData *kvdata)
 		OnGetRoomAddrRsp(kvdata);
 	else if(Protocol == PRO_RoomInfoBroadCast)
 		OnRoomInfoBroadCast(kvdata);
-	else if(Protocol == PRO_TableInfoBroadCast)
-		OnTableInfoBroadCast(kvdata);
+	else if(Protocol == PRO_AddGameRsp)
+		OnAddGameRsp(kvdata);
+	else if(Protocol == PRO_AddGameBroadCast)
+		OnAddGameBroadCast(kvdata);
 	else if(Protocol == PRO_DealPoker)
 		OnDealPoker(kvdata);
 	else
@@ -562,7 +564,7 @@ void CTractorGameDlg::OnAddGame()
 	SendProtocol(context, &m_RoomSocket);
 }
 
-void CTractorGameDlg::OnTableInfoBroadCast(KVData *kvdata)
+void CTractorGameDlg::OnAddGameRsp(KVData *kvdata)
 {
 	if(m_CurStatus != Status_Playing)
 		return ;
@@ -628,6 +630,11 @@ void CTractorGameDlg::OnTableInfoBroadCast(KVData *kvdata)
 	}
 
 	InvalidateRect(&m_TableRect);
+}
+
+void CTractorGameDlg::OnAddGameBroadCast(KVData *kvdata)
+{
+
 }
 
 void CTractorGameDlg::QuitGameReq()
