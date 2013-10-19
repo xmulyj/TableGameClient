@@ -15,77 +15,14 @@ using namespace easynet;
 #define new DEBUG_NEW
 #endif
 
-#define INTERFACE_IP  _T("192.168.80.132")
-//#define INTERFACE_IP  _T("192.168.179.129")
+//#define INTERFACE_IP  _T("192.168.80.132")
+#define INTERFACE_IP  _T("192.168.179.129")
 
 #define TABLE_NUM             6       //一行显示桌子数
 #define HEIGHT                      100  //桌子高
 #define WIDTH                       100  //桌子宽
 #define PADDING                   10    //桌子间隔
 #define VSCROLL_WIDTH   16   //滚动条宽
-
-
-void CTractorGameDlg::SendProtocol(ProtocolContext *context, CGameSocket *gamesocket)
-{
-	CString msg(context->Info.c_str());
-	msg += _T(":Start to send\r\n");
-
-	//设置socket数据
-	if(gamesocket->IsConnected == FALSE)
-	{
-		//connect to interface
-		AppendMsg(_T("connect to server,wait please...\r\n"));
-
-		gamesocket->Create();
-		if(TRUE==gamesocket->Connect(gamesocket->IP, gamesocket->Port))
-		{
-			gamesocket->IsConnected = TRUE;
-			AppendMsg(_T("connect to server successful.\r\n"));
-		}
-		else
-		{
-			CString temp;
-			uint32_t error_code = WSAGetLastError();
-
-			if(error_code == WSAEWOULDBLOCK)
-			{
-				temp.Format(_T("connect server WouldBlock Port=%d\r\n"), gamesocket->Port);
-				AppendMsg(temp);
-
-				gamesocket->m_SendContext = context;
-				gamesocket->AsyncSelect(FD_CONNECT);
-			}
-			else
-			{
-				temp.Format(_T("connect server failed. error_code=%u\r\n"), error_code);
-				AppendMsg(temp);
-				gamesocket->Close();
-			}
-			return ;
-		}
-	}
-	else
-	{
-		int send_size = gamesocket->Send(context->Buffer, context->Size);
-		if(send_size != context->Size)
-		{
-			if((send_size == -1&&WSAGetLastError()==WSAEWOULDBLOCK) || send_size>0)
-			{
-				context->send_size = send_size>0?send_size:0;
-				gamesocket->m_SendContext = context;
-				gamesocket->AsyncSelect(FD_WRITE|FD_CLOSE);
-				return ;
-			}
-			else
-				AppendMsg(_T("send GetRoomListReq error.\r\n"));
-		}
-		else
-		{
-			AppendMsg(_T("send GetRoomListReq finished.\r\n"));
-		}
-		delete context;
-	}
-}
 
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
 
@@ -287,6 +224,19 @@ HCURSOR CTractorGameDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+//时钟事件
+void CTractorGameDlg::OnTimer(UINT_PTR nIDEvent)
+{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+	if(nIDEvent == 1)  //打印房间列表
+	{
+		AppendMsg(_T("Timer:GetRoomListReq\r\n"));
+		GetRoomListReq();
+	}
+	CDialog::OnTimer(nIDEvent);
+}
+
+
 void CTractorGameDlg::AppendMsg(LPCTSTR msg)
 {
 	CRichEditCtrl* msg_ctrl = (CRichEditCtrl*)GetDlgItem(IDC_MSG);
@@ -295,24 +245,68 @@ void CTractorGameDlg::AppendMsg(LPCTSTR msg)
 	msg_ctrl->ReplaceSel(msg);
 }
 
-void CTractorGameDlg::OnReceiveProtocol(KVData *kvdata)
+////////////////////////////////////////////////////////////
+//发送协议
+void CTractorGameDlg::SendProtocol(ProtocolContext *context, CGameSocket *gamesocket)
 {
-	int Protocol;
-	kvdata->GetValue(KEY_Protocol, Protocol);
-	if(Protocol == PRO_GetRoomListRsp)
-		OnGetRoomListRsp(kvdata);
-	else if(Protocol == PRO_GetRoomAddrRsp)
-		OnGetRoomAddrRsp(kvdata);
-	else if(Protocol == PRO_RoomInfoBroadCast)
-		OnRoomInfoBroadCast(kvdata);
-	else if(Protocol == PRO_AddGameRsp)
-		OnAddGameRsp(kvdata);
-	else if(Protocol == PRO_AddGameBroadCast)
-		OnAddGameBroadCast(kvdata);
-	else if(Protocol == PRO_DealPoker)
-		OnDealPoker(kvdata);
+	CString msg(context->Info.c_str());
+	msg += _T(":Start to send\r\n");
+
+	//设置socket数据
+	if(gamesocket->IsConnected == FALSE)
+	{
+		//connect to interface
+		AppendMsg(_T("connect to server,wait please...\r\n"));
+
+		gamesocket->Create();
+		if(TRUE==gamesocket->Connect(gamesocket->IP, gamesocket->Port))
+		{
+			gamesocket->IsConnected = TRUE;
+			AppendMsg(_T("connect to server successful.\r\n"));
+		}
+		else
+		{
+			CString temp;
+			uint32_t error_code = WSAGetLastError();
+
+			if(error_code == WSAEWOULDBLOCK)
+			{
+				temp.Format(_T("connect server WouldBlock Port=%d\r\n"), gamesocket->Port);
+				AppendMsg(temp);
+
+				gamesocket->m_SendContext = context;
+				gamesocket->AsyncSelect(FD_CONNECT);
+			}
+			else
+			{
+				temp.Format(_T("connect server failed. error_code=%u\r\n"), error_code);
+				AppendMsg(temp);
+				gamesocket->Close();
+			}
+			return ;
+		}
+	}
 	else
-		assert(0);
+	{
+		int send_size = gamesocket->Send(context->Buffer, context->Size);
+		if(send_size != context->Size)
+		{
+			if((send_size == -1&&WSAGetLastError()==WSAEWOULDBLOCK) || send_size>0)
+			{
+				context->send_size = send_size>0?send_size:0;
+				gamesocket->m_SendContext = context;
+				gamesocket->AsyncSelect(FD_WRITE|FD_CLOSE);
+				return ;
+			}
+			else
+				AppendMsg(_T("send GetRoomListReq error.\r\n"));
+		}
+		else
+		{
+			AppendMsg(_T("send GetRoomListReq finished.\r\n"));
+		}
+		delete context;
+	}
 }
 
 bool CTractorGameDlg::GetRoomListReq()
@@ -337,55 +331,7 @@ bool CTractorGameDlg::GetRoomListReq()
 	factory.EncodeHeader(context->Buffer, body_size);
 
 	SendProtocol(context, &m_InterfaceSocket);
-		
-	return true;
-}
 
-bool CTractorGameDlg::OnGetRoomListRsp(KVData *kvdata)
-{
-	int RoomNum;
-	char *NumArray;
-
-	AppendMsg(_T("OnGetRoomListRsp\r\n"));
-	kvdata->GetValue(KEY_RoomNum, RoomNum);
-	m_RoomList.clear();    //应该上锁的,否则画图的时候取出对于的room_info会有问题
-	if(RoomNum > 0)
-	{
-		uint32_t size;
-		kvdata->GetValue(KEY_Array, NumArray, size);
-		assert(size == RoomNum*sizeof(int)*2);
-		int *temp_buff = (int*)NumArray;
-		for(int i=0; i<RoomNum; ++i)
-		{
-			RoomInfo room_info;
-			room_info.RoomID = ntohl(temp_buff[0]);
-			room_info.ClientNum = ntohl(temp_buff[1]);
-			temp_buff += 2;
-			m_RoomList.push_back(room_info);
-		}
-	}
-	m_RoomListCtrl.SetRedraw(FALSE);
-	m_RoomListCtrl.DeleteAllItems();
-	for(int i=0; i<m_RoomList.size(); ++i)
-	{
-		CString temp;
-		temp.Format(_T("房间%d(%d人)"),i+1, m_RoomList[i].ClientNum);
-		m_RoomListCtrl.InsertItem(i, temp);
-	}
-	m_RoomListCtrl.SetRedraw(TRUE);
-
-
-	if(RoomNum>0 && m_SelectRoomIndex==-1)
-	{
-		m_SelectRoomIndex = 0;
-		m_SelectRoom = m_RoomList[0];
-	}
-
-	SetTimer(1, 3000, NULL);
-
-	//请求房间地址
-	if(m_CurStatus==Status_PrintTableList && !m_RoomSocket.IsConnected &&  m_SelectRoomIndex>=0)
-		GetRoomAddrReq();
 	return true;
 }
 
@@ -412,20 +358,6 @@ bool CTractorGameDlg::GetRoomAddrReq()
 
 	SendProtocol(context, &m_InterfaceSocket);
 
-	return true;
-}
-
-bool CTractorGameDlg::OnGetRoomAddrRsp(KVData *kvdata)
-{
-	AppendMsg(_T("OnGetRoomAddrRsp\r\n"));
-	int RoomID = -1;
-	kvdata->GetValue(KEY_RoomID, RoomID);
-	assert(RoomID>=0 && RoomID==m_SelectRoom.RoomID);
-	kvdata->GetValue(KEY_RoomIP, m_SelectRoom.IP);
-	kvdata->GetValue(KEY_RoomPort, m_SelectRoom.Port);
-
-	if(m_CurStatus == Status_PrintTableList)
-		IntoRoomReq();
 	return true;
 }
 
@@ -490,6 +422,211 @@ bool CTractorGameDlg::LeaveRoomReq()
 	return true;
 }
 
+
+void CTractorGameDlg::AddGameReq()
+{
+	if(m_CurStatus != Status_Playing)
+		return ;
+	if(!m_RoomSocket.IsConnected)
+	{
+		m_CurStatus = Status_PrintTableList;
+		IntoRoomReq();
+		return;
+	}
+
+	assert(m_SelectRoomIndex>=0 && m_SelectRoomIndex<m_RoomList.size());
+
+	//Send AddGame request
+	KVData kvdata(true);
+	kvdata.SetValue(KEY_Protocol, PRO_AddGame);
+	kvdata.SetValue(KEY_RoomID, m_SelectRoom.RoomID);
+	kvdata.SetValue(KEY_TableID, m_SelectTableIndex);
+	kvdata.SetValue(KEY_ClientID, m_UID);
+	kvdata.SetValue(KEY_ClientName, m_UName);
+
+	KVDataProtocolFactory factory;
+	unsigned int header_size = factory.HeaderSize();
+	unsigned int body_size = kvdata.Size();
+	ProtocolContext *context = new ProtocolContext(header_size+body_size);
+	context->type = DTYPE_BIN;
+	context->Info = "AddGame";
+
+	kvdata.Serialize(context->Buffer+header_size);
+	context->Size = header_size+body_size;
+	factory.EncodeHeader(context->Buffer, body_size);
+
+	SendProtocol(context, &m_RoomSocket);
+}
+
+void CTractorGameDlg::QuitGameReq()
+{
+	if(!m_RoomSocket.IsConnected)
+	{
+		m_CurStatus = Status_PrintTableList;
+		IntoRoomReq();
+		return;
+	}
+	assert(m_SelectRoomIndex>=0 && m_SelectRoomIndex<m_RoomList.size());
+
+	//Send AddGame request
+	KVData kvdata(true);
+	kvdata.SetValue(KEY_Protocol, PRO_QuitGame);
+	kvdata.SetValue(KEY_RoomID, m_SelectRoom.RoomID);
+	kvdata.SetValue(KEY_TableID, m_SelectTableIndex);
+	kvdata.SetValue(KEY_ClientID, m_UID);
+	kvdata.SetValue(KEY_ClientName, m_UName);
+
+	KVDataProtocolFactory factory;
+	unsigned int header_size = factory.HeaderSize();
+	unsigned int body_size = kvdata.Size();
+	ProtocolContext *context = new ProtocolContext(header_size+body_size);
+	context->type = DTYPE_BIN;
+	context->Info = "QuitGame";
+
+	kvdata.Serialize(context->Buffer+header_size);
+	context->Size = header_size+body_size;
+	factory.EncodeHeader(context->Buffer, body_size);
+
+	m_RoomSocket.m_SendContext = context;
+	m_RoomSocket.AsyncSelect(FD_WRITE|FD_READ|FD_CLOSE);
+
+	m_SelectTableIndex = -1;
+	CString temp;
+	temp.Format(_T("send QuitGame request\r\n"));
+	AppendMsg(temp);
+}
+
+void CTractorGameDlg::StartGameReq()
+{
+	if(!m_RoomSocket.IsConnected)
+	{
+		m_CurStatus = Status_PrintTableList;
+		IntoRoomReq();
+		return;
+	}
+	assert(m_SelectRoomIndex>=0 && m_SelectRoomIndex<m_RoomList.size());
+
+	//Send AddGame request
+	KVData kvdata(true);
+	kvdata.SetValue(KEY_Protocol, PRO_StartGame);
+	kvdata.SetValue(KEY_RoomID, m_SelectRoom.RoomID);
+	kvdata.SetValue(KEY_TableID, m_SelectTableIndex);
+	kvdata.SetValue(KEY_ClientID, m_UID);
+	kvdata.SetValue(KEY_ClientName, m_UName);
+
+	KVDataProtocolFactory factory;
+	unsigned int header_size = factory.HeaderSize();
+	unsigned int body_size = kvdata.Size();
+	ProtocolContext *context = new ProtocolContext(header_size+body_size);
+	context->type = DTYPE_BIN;
+	context->Info = "StartGame";
+
+	kvdata.Serialize(context->Buffer+header_size);
+	context->Size = header_size+body_size;
+	factory.EncodeHeader(context->Buffer, body_size);
+
+	m_RoomSocket.m_SendContext = context;
+	m_RoomSocket.AsyncSelect(FD_WRITE|FD_READ|FD_CLOSE);
+
+	CString temp;
+	temp.Format(_T("send StartGame request\r\n"));
+	AppendMsg(temp);
+}
+
+////////////////////////////////////////////////////////////
+//接收协议
+void CTractorGameDlg::OnReceiveProtocol(KVData *kvdata)
+{
+	int Protocol;
+	kvdata->GetValue(KEY_Protocol, Protocol);
+	switch(Protocol)
+	{
+	case PRO_GetRoomListRsp:
+		OnGetRoomListRsp(kvdata);         break;
+	case PRO_GetRoomAddrRsp:
+		OnGetRoomAddrRsp(kvdata);      break;
+	case PRO_RoomInfoBroadCast:
+		OnRoomInfoBroadCast(kvdata);   break;
+	case PRO_AddGameRsp:
+		OnAddGameRsp(kvdata);             break;
+	case PRO_AddGameBroadCast:
+		OnAddGameBroadCast(kvdata);  break;
+	case PRO_StartGameBroadCast:
+		OnStartGameBroadCast(kvdata);  break;
+	case PRO_QuitGameBroadCast:
+		OnQuitGameBroadCast(kvdata);  break;
+	case PRO_DealPoker:
+		OnDealPoker(kvdata);                   break;
+	default:
+		assert(0);
+	}
+}
+
+
+bool CTractorGameDlg::OnGetRoomListRsp(KVData *kvdata)
+{
+	int RoomNum;
+	char *NumArray;
+
+	AppendMsg(_T("OnGetRoomListRsp\r\n"));
+	kvdata->GetValue(KEY_RoomNum, RoomNum);
+	m_RoomList.clear();    //应该上锁的,否则画图的时候取出对于的room_info会有问题
+	if(RoomNum > 0)
+	{
+		uint32_t size;
+		kvdata->GetValue(KEY_Array, NumArray, size);
+		assert(size == RoomNum*sizeof(int)*2);
+		int *temp_buff = (int*)NumArray;
+		for(int i=0; i<RoomNum; ++i)
+		{
+			RoomInfo room_info;
+			room_info.RoomID = ntohl(temp_buff[0]);
+			room_info.ClientNum = ntohl(temp_buff[1]);
+			temp_buff += 2;
+			m_RoomList.push_back(room_info);
+		}
+	}
+	m_RoomListCtrl.SetRedraw(FALSE);
+	m_RoomListCtrl.DeleteAllItems();
+	for(int i=0; i<m_RoomList.size(); ++i)
+	{
+		CString temp;
+		temp.Format(_T("房间%d(%d人)"),i+1, m_RoomList[i].ClientNum);
+		m_RoomListCtrl.InsertItem(i, temp);
+	}
+	m_RoomListCtrl.SetRedraw(TRUE);
+
+
+	if(RoomNum>0 && m_SelectRoomIndex==-1)
+	{
+		m_SelectRoomIndex = 0;
+		m_SelectRoom = m_RoomList[0];
+	}
+
+	SetTimer(1, 3000, NULL);
+
+	//请求房间地址
+	if(m_CurStatus==Status_PrintTableList && !m_RoomSocket.IsConnected &&  m_SelectRoomIndex>=0)
+		GetRoomAddrReq();
+	return true;
+}
+
+bool CTractorGameDlg::OnGetRoomAddrRsp(KVData *kvdata)
+{
+	AppendMsg(_T("OnGetRoomAddrRsp\r\n"));
+	int RoomID = -1;
+	kvdata->GetValue(KEY_RoomID, RoomID);
+	assert(RoomID>=0 && RoomID==m_SelectRoom.RoomID);
+	kvdata->GetValue(KEY_RoomIP, m_SelectRoom.IP);
+	kvdata->GetValue(KEY_RoomPort, m_SelectRoom.Port);
+
+	if(m_CurStatus == Status_PrintTableList)
+		IntoRoomReq();
+	return true;
+}
+
+
+
 bool CTractorGameDlg::OnRoomInfoBroadCast(KVData *kvdata)
 {
 	int RoomID;
@@ -529,40 +666,6 @@ bool CTractorGameDlg::OnRoomInfoBroadCast(KVData *kvdata)
 	return true;
 }
 
-void CTractorGameDlg::OnAddGame()
-{
-	if(m_CurStatus != Status_Playing)
-		return ;
-	if(!m_RoomSocket.IsConnected)
-	{
-		m_CurStatus = Status_PrintTableList;
-		IntoRoomReq();
-		return;
-	}
-
-	assert(m_SelectRoomIndex>=0 && m_SelectRoomIndex<m_RoomList.size());
-
-	//Send AddGame request
-	KVData kvdata(true);
-	kvdata.SetValue(KEY_Protocol, PRO_AddGame);
-	kvdata.SetValue(KEY_RoomID, m_SelectRoom.RoomID);
-	kvdata.SetValue(KEY_TableID, m_SelectTableIndex);
-	kvdata.SetValue(KEY_ClientID, m_UID);
-	kvdata.SetValue(KEY_ClientName, m_UName);
-
-	KVDataProtocolFactory factory;
-	unsigned int header_size = factory.HeaderSize();
-	unsigned int body_size = kvdata.Size();
-	ProtocolContext *context = new ProtocolContext(header_size+body_size);
-	context->type = DTYPE_BIN;
-	context->Info = "AddGame";
-
-	kvdata.Serialize(context->Buffer+header_size);
-	context->Size = header_size+body_size;
-	factory.EncodeHeader(context->Buffer, body_size);
-	
-	SendProtocol(context, &m_RoomSocket);
-}
 
 void CTractorGameDlg::OnAddGameRsp(KVData *kvdata)
 {
@@ -574,14 +677,16 @@ void CTractorGameDlg::OnAddGameRsp(KVData *kvdata)
 	int    PlayerNum;
 	int    AudienceNum;
 	char   *NumArray;
+	int    PokerNum;
 
 	kvdata->GetValue(KEY_Message, Message);
 	kvdata->GetValue(KEY_NeedNum, NeedNum);
 	kvdata->GetValue(KEY_PlayerNum, PlayerNum);
+	kvdata->GetValue(KEY_PokerNum, PokerNum);
 	kvdata->GetValue(KEY_AudienceNum, AudienceNum);
 	unsigned int size=0;
 	kvdata->GetValue(KEY_Array, NumArray, size);
-	assert(size == sizeof(int)*2*(PlayerNum+AudienceNum));
+	assert(size == sizeof(int)*3*(PlayerNum+AudienceNum));
 
 	CString temp(Message.c_str());
 	CString msg(_T("TableInfo message:"));
@@ -589,25 +694,33 @@ void CTractorGameDlg::OnAddGameRsp(KVData *kvdata)
 	AppendMsg(msg);
 
 	int *temp_buf = (int*)NumArray, i=0;
-	m_PlayerStatus.clear();
-	m_AudienceStatus.clear();
+	m_Player.clear();
+	m_Audience.clear();
 	for(i=0; i<PlayerNum; ++i)
 	{
-		TableStatus player_status;
-		player_status.client_id = ntohl(*temp_buf++);
-		player_status.status = ntohl(*temp_buf++);
-		m_PlayerStatus.push_back(player_status);
-		if(player_status.client_id == m_UID)
-			m_MyStatus = player_status.status;
+		Player player;
+		player.client_id = ntohl(*temp_buf++);
+		player.status = ntohl(*temp_buf++);
+		player.index = ntohl(*temp_buf++);
+
+		m_Player.push_back(player);
+		if(player.client_id == m_UID)
+			m_MyStatus = player.status;
 	}
 	for(int i=0; i<AudienceNum; ++i)
 	{
-		TableStatus audience_status;
-		audience_status.client_id = ntohl(*temp_buf++);
-		audience_status.status = ntohl(*temp_buf++);
-		m_AudienceStatus.push_back(audience_status);
-		if(audience_status.client_id == m_UID)
-			m_MyStatus = audience_status.status;
+		Player audience;
+		audience.client_id = ntohl(*temp_buf++);
+		audience.status = ntohl(*temp_buf++);
+		audience.index = ntohl(*temp_buf++);
+		m_Audience.push_back(audience);
+
+		if(audience.client_id == m_UID)
+		{
+			m_MyStatus = audience.status;
+			for(int j=0; j<PlayerNum; ++j)    //已经发了PokerNun个扑克牌
+				m_Player[j].poker.resize(PokerNum, -1);
+		}
 	}
 
 	if(m_MyStatus == 2)  //等待状态
@@ -634,47 +747,109 @@ void CTractorGameDlg::OnAddGameRsp(KVData *kvdata)
 
 void CTractorGameDlg::OnAddGameBroadCast(KVData *kvdata)
 {
+	Player player;
+	kvdata->GetValue(KEY_ClientID, player.client_id);
+	kvdata->GetValue(KEY_ClientName, player.client_name);
+	kvdata->GetValue(KEY_PosIndex, player.index);
 
-}
-
-void CTractorGameDlg::QuitGameReq()
-{
-	if(!m_RoomSocket.IsConnected)
+	for(int i=0; i<m_Audience.size(); ++i)
 	{
-		m_CurStatus = Status_PrintTableList;
-		IntoRoomReq();
-		return;
+		if(m_Audience[i].client_id == player.client_id)
+		{
+			if(i < m_Audience.size()-1)
+				m_Audience[i] = m_Audience[m_Audience.size()-1];
+			m_Audience.pop_back();
+		}
 	}
 
-	assert(m_SelectRoomIndex>=0 && m_SelectRoomIndex<m_RoomList.size());
+	if(player.index < 0)
+	{
+		player.status = 1;    //观众
+		m_Audience.push_back(player);
+	}
+	else
+	{
+		player.status = 2;  //玩家
+		m_Player.push_back(player);
 
-	//Send AddGame request
-	KVData kvdata(true);
-	kvdata.SetValue(KEY_Protocol, PRO_QuitGame);
-	kvdata.SetValue(KEY_RoomID, m_SelectRoom.RoomID);
-	kvdata.SetValue(KEY_TableID, m_SelectTableIndex);
-	kvdata.SetValue(KEY_ClientID, m_UID);
-	kvdata.SetValue(KEY_ClientName, m_UName);
-
-	KVDataProtocolFactory factory;
-	unsigned int header_size = factory.HeaderSize();
-	unsigned int body_size = kvdata.Size();
-	ProtocolContext *context = new ProtocolContext(header_size+body_size);
-	context->type = DTYPE_BIN;
-	context->Info = "QuitGame";
-
-	kvdata.Serialize(context->Buffer+header_size);
-	context->Size = header_size+body_size;
-	factory.EncodeHeader(context->Buffer, body_size);
-
-	m_RoomSocket.m_SendContext = context;
-	m_RoomSocket.AsyncSelect(FD_WRITE|FD_READ|FD_CLOSE);
-
-	m_SelectTableIndex = -1;
-	CString temp;
-	temp.Format(_T("send QuitGame request\r\n"));
-	AppendMsg(temp);
+		if(m_Player.size() >= m_SelectRoom.NeedNum)
+			GetDlgItem(IDC_ADDGAME)->ShowWindow(SW_HIDE);
+	}
+	
+	InvalidateRect(&m_TableRect);
 }
+
+void CTractorGameDlg::OnStartGameBroadCast(KVData *kvdata)
+{
+	int client_id;
+	string client_name;
+	kvdata->GetValue(KEY_ClientID, client_id);
+	kvdata->GetValue(KEY_ClientName, client_name);
+
+	int i;
+	for(i=0; i<m_Player.size(); ++i)
+	{
+		if(m_Player[i].client_id == client_id)
+		{
+			m_Player[i].status = 3;
+			InvalidateRect(&m_TableRect);
+			break;
+		}
+	}
+
+	assert(i<m_Player.size());
+}
+
+void CTractorGameDlg::OnQuitGameBroadCast(KVData *kvdata)
+{
+	int client_id;
+	string client_name;
+	int pos_index;
+
+	kvdata->GetValue(KEY_ClientID, client_id);
+	kvdata->GetValue(KEY_ClientName, client_name);
+
+	bool find = false;
+	for(int i=0; i<m_Player.size(); ++i)  //是否是玩家
+	{
+		if(m_Player[i].client_id != client_id)
+			continue;
+		find = true;
+		if(i < m_Player.size()-1)
+			m_Player[i] = m_Player[m_Player.size()-1];
+		m_Player.pop_back();
+
+		for(int j=0; j<m_Player.size(); ++j)  //剩下玩家的状态设置为等待
+		{
+			m_Player[j].status = 2;
+			m_Player[j].poker.clear();
+			if(m_Player[j].client_id == m_UID)
+			{
+				GetDlgItem(IDC_STARTGAME)->ShowWindow(SW_NORMAL);
+				m_MyStatus = 2;
+			}
+		}
+		for(int j=0; j<m_Audience.size(); ++j) 
+		{
+			m_Audience[j].poker.clear();
+			if(m_Audience[j].client_id == m_UID)
+				GetDlgItem(IDC_ADDGAME)->ShowWindow(SW_NORMAL);
+		}
+	}
+
+	for(int i=0; !find && i<m_Audience.size(); ++i)  //是否是观众
+	{
+		if(m_Audience[i].client_id == client_id)
+		{
+			if(i < m_Audience.size()-1)
+				m_Player[i] = m_Audience[m_Audience.size()-1];
+			m_Audience.pop_back();
+		}
+	}
+
+	InvalidateRect(&m_TableRect);
+}
+
 
 void CTractorGameDlg::OnDealPoker(KVData *kvdata)
 {
@@ -685,7 +860,7 @@ void CTractorGameDlg::OnDealPoker(KVData *kvdata)
 
 	kvdata->GetValue(KEY_CardFlag, CardFlag);
 	bool IsSetArray  = kvdata->GetValue(KEY_Array, Array, size);
-	assert((m_MyStatus==1 && IsSetArray==true) || (m_MyStatus==3 && IsSetArray==true));
+	assert(m_MyStatus==1 || (m_MyStatus==3&&IsSetArray==true));
 	
 	int CardNum = 0;
 	if(IsSetArray == true)
@@ -697,36 +872,38 @@ void CTractorGameDlg::OnDealPoker(KVData *kvdata)
 	}
 
 	int my_index = 0;
-	for(int i=0; i<m_PlayerStatus.size(); ++i)
+	for(int i=0; i<m_Player.size(); ++i)
 	{
-		if(m_PlayerStatus[i].client_id==m_UID)
+		if(m_Player[i].client_id==m_UID)
 		{
 			my_index = i;
 			for(int j=0; j<CardNum; j++)
 			{
-				m_PlayerStatus[i].poker.push_back(poker[j]);
-				int pos = m_PlayerStatus[i].poker.size()-1;
+				m_Player[i].poker.push_back(poker[j]);
+				int pos = m_Player[i].poker.size()-1;
 				while(pos > 0)
 				{
-					if( poker[j] <= m_PlayerStatus[i].poker[pos-1])
+					if( poker[j] <= m_Player[i].poker[pos-1])
 						break;
-					m_PlayerStatus[i].poker[pos] = m_PlayerStatus[i].poker[pos-1];
+					m_Player[i].poker[pos] = m_Player[i].poker[pos-1];
 					--pos;
 				}	
-				m_PlayerStatus[i].poker[pos] = poker[j];
+				m_Player[i].poker[pos] = poker[j];
 			}
 		}
 		else
-			m_PlayerStatus[i].poker.push_back(-1);
+			m_Player[i].poker.push_back(-1);
 	}
 
 	InvalidateRect(&m_TableRect);
 
 	CString msg;
-	msg.Format(_T("OnDealPoker:cur Poker=%u\r\n"), m_PlayerStatus[my_index].poker.size());
+	msg.Format(_T("OnDealPoker:cur Poker=%u\r\n"), m_Player[my_index].poker.size());
 	AppendMsg(msg);
 }
 
+////////////////////////////////////////////////////////////
+//对话框事件
 void CTractorGameDlg::OnBnClickedLoad()
 {
 	// TODO: 在此添加控件通知处理程序代码
@@ -774,17 +951,6 @@ void CTractorGameDlg::OnStaticRoomClick()
 	}
 }
 
-void CTractorGameDlg::OnTimer(UINT_PTR nIDEvent)
-{
-	// TODO: 在此添加消息处理程序代码和/或调用默认值
-	if(nIDEvent == 1)  //打印房间列表
-	{
-		AppendMsg(_T("Timer:GetRoomListReq\r\n"));
-		GetRoomListReq();
-	}
-	CDialog::OnTimer(nIDEvent);
-}
-
 void CTractorGameDlg::OnNMDblclkRoomlist(NMHDR *pNMHDR, LRESULT *pResult)
 {
 	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
@@ -817,6 +983,127 @@ void CTractorGameDlg::OnNMDblclkRoomlist(NMHDR *pNMHDR, LRESULT *pResult)
 	*pResult = 0;
 }
 
+void CTractorGameDlg::OnLButtonDown(UINT nFlags, CPoint point)
+{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+	if(m_CurStatus == Status_PrintTableList)
+	{
+		if(point.x>=m_TableRect.left&&point.x<m_TableRect.right
+			&&point.y>=m_TableRect.top&&point.y<m_TableRect.bottom)
+			m_LButtonDown = TRUE;
+		m_PreMousePoint = point;
+	}
+	//CDialog::OnLButtonDown(nFlags, point);
+}
+
+void CTractorGameDlg::OnLButtonUp(UINT nFlags, CPoint point)
+{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+	m_LButtonDown = FALSE;
+	CDialog::OnLButtonUp(nFlags, point);
+}
+
+void CTractorGameDlg::OnMouseMove(UINT nFlags, CPoint point)
+{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+	if(m_LButtonDown == TRUE)
+	{
+		if(m_VScrollBarHeight > 0)  //有滚动条
+		{
+			int y_offset = m_VScrollBarYOffset+point.y-m_PreMousePoint.y;
+			m_PreMousePoint = point;
+			if(y_offset >= 0 && y_offset+m_VScrollBarHeight<=m_TableRect.Height())
+			{
+				m_VScrollBarYOffset = y_offset;				
+				InvalidateRect(&m_TableRect);
+			}
+		}
+	}
+	CDialog::OnMouseMove(nFlags, point);
+}
+
+void CTractorGameDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
+{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+	if(m_CurStatus == Status_PrintTableList)
+	{
+		if(point.x>=m_TableRect.left+2&&point.x<m_TableRect.right-VSCROLL_WIDTH-2
+			&&point.y>=m_TableRect.top+2&&point.y<m_TableRect.bottom-2)
+		{
+			//转换点在table中的逻辑坐标
+
+			int y_offset = m_VScrollBarHeight>0?m_VScrollBarYOffset*(m_TableRect.Height()-4)/m_VScrollBarHeight:0;
+			int y = point.y-(m_TableRect.top+2)+y_offset;
+			int x =  point.x-(m_TableRect.left+2)-m_TableRectXOffset;
+
+			int row = y/(HEIGHT+PADDING) + (y%(HEIGHT+PADDING)>0?1:0);
+			int column = x/(WIDTH+PADDING) + (x%(WIDTH+PADDING)>0?1:0);
+
+			if(y<row*(HEIGHT+PADDING) -PADDING && x<column*(WIDTH+PADDING) -PADDING)   //点中的是桌子(而不是间隔)
+			{
+				m_CurStatus = Status_Playing;
+				m_SelectTableIndex = (row-1)*TABLE_NUM+(column-1);
+
+				CString temp;
+				temp.Format(_T("Into Table[%d]\r\n"), m_SelectTableIndex+1);
+				AppendMsg(temp);
+
+				//KillTimer(2);
+				temp.Format(_T("->房间[%02d]"), m_SelectRoomIndex+1);
+				GetDlgItem(IDC_STATIC_ROOM)->SetWindowText(temp);
+				GetDlgItem(IDC_STATIC_ROOM)->ShowWindow(SW_NORMAL);
+				temp.Format(_T("->桌子[%02d]"), m_SelectTableIndex+1);
+				GetDlgItem(IDC_STATIC_TABLE)->SetWindowText(temp);
+				GetDlgItem(IDC_STATIC_TABLE)->ShowWindow(SW_NORMAL);
+
+				InvalidateRect(&m_TableRect);
+				AddGameReq();
+			}
+
+		}
+	}
+
+	CDialog::OnLButtonDblClk(nFlags, point);
+}
+
+void CTractorGameDlg::OnBnClickedStartgame()
+{
+	if(!m_RoomSocket.IsConnected)
+	{
+		m_CurStatus = Status_PrintTableList;
+		IntoRoomReq();
+		return;
+	}
+	assert(m_SelectRoomIndex>=0 && m_SelectRoom.RoomID>=0);
+
+	for(int i=0; i<m_Player.size(); ++i)
+	{
+		if(m_Player[i].client_id != m_UID)
+			continue;
+		m_Player[i].status = 3;  //开始
+		m_MyStatus = 3;
+
+		InvalidateRect(&m_TableRect);
+		GetDlgItem(IDC_STARTGAME)->ShowWindow(SW_HIDE);
+		break;
+	}
+
+	StartGameReq();
+}
+
+void CTractorGameDlg::OnBnClickedAddgame()
+{
+	if(!m_RoomSocket.IsConnected)
+	{
+		m_CurStatus = Status_PrintTableList;
+		IntoRoomReq();
+	}
+	else
+		AddGameReq();
+}
+
+////////////////////////////////////////////////////////////
+//绘图相关
 void CTractorGameDlg::OnPaint_TableList(CRect &client_rect)
 {
 	CPaintDC dc(this);
@@ -955,7 +1242,15 @@ void CTractorGameDlg::OnPaint_TableList(CRect &client_rect)
 
 void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 {
-	CPaintDC dc(this);
+	CPaintDC paint_dc(this);
+	CDC dc;
+	CRect dc_rect;
+	GetClientRect(&dc_rect);
+	//内存dc
+	CBitmap mem_bitmap;
+	mem_bitmap.CreateCompatibleBitmap(&paint_dc, dc_rect.Width(), dc_rect.Height());
+	dc.CreateCompatibleDC(&paint_dc);
+	CBitmap *old_membitmap = dc.SelectObject(&mem_bitmap);
 	dc.SetBkMode(TRANSPARENT);
 
 	CRect rect, draw_rect;
@@ -969,7 +1264,7 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 
 	//画分割线
 	rect = client_rect;
-	rect.left = rect.right-200;
+	rect.left = rect.right-100;
 	dc.MoveTo(rect.left, rect.top);
 	dc.LineTo(rect.left, rect.bottom);
 	dc.SelectStockObject(NULL_PEN);
@@ -984,11 +1279,11 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 	dc.SelectObject(&brush);
 
 	int i, index = -1;
-	for(i=0; i<m_PlayerStatus.size(); ++i)
+	for(i=0; i<m_Player.size(); ++i)
 	{
-		if(m_PlayerStatus[i].client_id == m_UID)
+		if(m_Player[i].client_id == m_UID)
 		{
-			index = i;   //自己在桌子中的位置
+			index = m_Player[i].index;   //自己在桌子中的位置
 			break;
 		}
 	}
@@ -1003,9 +1298,9 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 
 	CString StatusStr[4]={_T("UnKnow"),_T("Audience"),_T("Wait"), _T("Playing")};
 
-	for(i=0; i<m_PlayerStatus.size(); ++i)
+	for(i=0; i<m_Player.size(); ++i)
 	{
-		int pos = (i+delta)%m_SelectRoom.NeedNum;
+		int pos = (m_Player[i].index+delta)%m_SelectRoom.NeedNum;
 		if(pos == 0)
 		{
 			x = rect.left+20;
@@ -1043,8 +1338,8 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 			dc.Ellipse(&draw_rect);
 
 		CString lable, poker;
-		lable.Format(_T("uid[%d]:"), m_PlayerStatus[i].client_id);
-		lable += StatusStr[m_PlayerStatus[i].status];
+		lable.Format(_T("uid[%d]:"), m_Player[i].client_id);
+		lable += StatusStr[m_Player[i].status];
 		if(pos==3 && m_MyStatus>1)
 		{
 			COLORREF old_color = dc.GetTextColor();
@@ -1056,27 +1351,26 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 			dc.TextOut(x, y, lable, lable.GetLength());
 
 		//画扑克
-
 		CRect poker_rect;
-		if(m_PlayerStatus[i].poker.size() > 0)
+		if(m_Player[i].poker.size() > 0)
 		{
 			int poker_width = 0;
 			int poker_height = 0;
 			if(pos == 0 || pos ==2)
 			{
 				poker_width = 140;
-				poker_height = (m_PlayerStatus[i].poker.size()-1)*18+100;
+				poker_height = (m_Player[i].poker.size()-1)*8+100;
 				poker_rect.top = y-poker_height/2;
-				poker_rect.left = pos==0?x+40:x-140;
+				poker_rect.left = pos==0?x:x-140;
 				poker_rect.bottom = poker_rect.top+100;
 				poker_rect.right = poker_rect.left+140;
 			}
 			else
 			{
 				poker_height = 140;
-				poker_width = (m_PlayerStatus[i].poker.size()-1)*18+100;
+				poker_width = (m_Player[i].poker.size()-1)*16+100;
 				poker_rect.left = x-poker_width/2;
-				poker_rect.top = pos==1?y+40:y-140;
+				poker_rect.top = pos==1?y:y-140;
 				poker_rect.bottom = poker_rect.top+140;
 				poker_rect.right = poker_rect.left+100;
 			}
@@ -1088,7 +1382,7 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 				MemDC_BgMask.CreateCompatibleDC(&dc);
 				MemDC_BgMask.SelectObject(&m_BgMaskBmp);
 
-				for(int npoker=0; npoker<m_PlayerStatus[i].poker.size(); ++npoker)
+				for(int npoker=0; npoker<m_Player[i].poker.size(); ++npoker)
 				{
 					dc.BitBlt(poker_rect.left, poker_rect.top, poker_rect.Width(),poker_rect.Height(), &MemDC_BgMask, 0,0,SRCAND);
 
@@ -1106,9 +1400,9 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 
 					CDC MemDC_Front;
 					MemDC_Front.CreateCompatibleDC(&dc);
-					MemDC_Front.SelectObject(&m_PokerBmp[m_PlayerStatus[i].poker[npoker]]);
+					MemDC_Front.SelectObject(&m_PokerBmp[m_Player[i].poker[npoker]]);
 					CString msg;
-					msg.Format(_T("%d,"), m_PlayerStatus[i].poker[npoker]);
+					msg.Format(_T("%d,"), m_Player[i].poker[npoker]);
 					AppendMsg(msg);
 					MemDC.BitBlt(0,0,100,140, &MemDC_Front, 0, 0, SRCAND);
 
@@ -1118,11 +1412,32 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 					poker_rect.right += 18;
 				}
 			}*/
-			if(pos == 3)
+			if(pos==0 || pos==2)
 			{
-				for(int npoker=0; npoker<m_PlayerStatus[i].poker.size(); ++npoker)
+				for(int npoker=0; npoker<m_Player[i].poker.size(); ++npoker)
 				{
-					DrawPoker(&dc, poker_rect, &m_PokerBmp[m_PlayerStatus[i].poker[npoker]]);
+					DrawPoker(&dc, poker_rect, &m_HBackBmp);
+					poker_rect.top+=8;
+					poker_rect.bottom += 8;
+				}
+			}
+			else if(pos == 1)
+			{
+				for(int npoker=0; npoker<m_Player[i].poker.size(); ++npoker)
+				{
+					DrawPoker(&dc, poker_rect, &m_VBackBmp);
+					poker_rect.left+=16;
+					poker_rect.right += 16;
+				}
+			}
+			else if(pos == 3)
+			{
+				for(int npoker=0; npoker<m_Player[i].poker.size(); ++npoker)
+				{
+					if(m_Player[i].poker[npoker] < 0)
+						DrawPoker(&dc, poker_rect, &m_VBackBmp);
+					else
+						DrawPoker(&dc, poker_rect, &m_PokerBmp[m_Player[i].poker[npoker]]);
 					poker_rect.left+=16;
 					poker_rect.right += 16;
 				}
@@ -1131,13 +1446,13 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 	}
 
 	//画旁观者
-	x = client_rect.right-190;
+	x = client_rect.right-90;
 	y = rect.top+6;
-	for(int i=0; i<m_AudienceStatus.size(); ++i)
+	for(int i=0; i<m_Audience.size(); ++i)
 	{
 		CString lable;
-		lable.Format(_T("%d"), m_AudienceStatus[i].client_id);
-		if(m_AudienceStatus[i].client_id == m_UID)
+		lable.Format(_T("%d"), m_Audience[i].client_id);
+		if(m_Audience[i].client_id == m_UID)
 		{
 			COLORREF old_color = dc.GetTextColor();
 			dc.SetTextColor(RGB(255, 0, 0));
@@ -1149,141 +1464,13 @@ void CTractorGameDlg::OnPaint_Talbe(CRect &client_rect)
 		y+=25;
 	}
 
+	paint_dc.BitBlt(client_rect.left, client_rect.top, client_rect.Width(), client_rect.Height(), &dc, client_rect.left, client_rect.top, SRCCOPY);
+
 	dc.SelectObject(old_brush);
 	dc.SelectObject(old_pen);
+	dc.SelectObject(old_membitmap);
 }
 
-void CTractorGameDlg::OnLButtonDown(UINT nFlags, CPoint point)
-{
-	// TODO: 在此添加消息处理程序代码和/或调用默认值
-	if(m_CurStatus == Status_PrintTableList)
-	{
-		if(point.x>=m_TableRect.left&&point.x<m_TableRect.right
-			&&point.y>=m_TableRect.top&&point.y<m_TableRect.bottom)
-			m_LButtonDown = TRUE;
-		m_PreMousePoint = point;
-	}
-	//CDialog::OnLButtonDown(nFlags, point);
-}
-
-void CTractorGameDlg::OnLButtonUp(UINT nFlags, CPoint point)
-{
-	// TODO: 在此添加消息处理程序代码和/或调用默认值
-	m_LButtonDown = FALSE;
-	CDialog::OnLButtonUp(nFlags, point);
-}
-
-void CTractorGameDlg::OnMouseMove(UINT nFlags, CPoint point)
-{
-	// TODO: 在此添加消息处理程序代码和/或调用默认值
-	if(m_LButtonDown == TRUE)
-	{
-		if(m_VScrollBarHeight > 0)  //有滚动条
-		{
-			int y_offset = m_VScrollBarYOffset+point.y-m_PreMousePoint.y;
-			m_PreMousePoint = point;
-			if(y_offset >= 0 && y_offset+m_VScrollBarHeight<=m_TableRect.Height())
-			{
-				m_VScrollBarYOffset = y_offset;				
-				InvalidateRect(&m_TableRect);
-			}
-		}
-	}
-	CDialog::OnMouseMove(nFlags, point);
-}
-
-void CTractorGameDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
-{
-	// TODO: 在此添加消息处理程序代码和/或调用默认值
-	if(m_CurStatus == Status_PrintTableList)
-	{
-		if(point.x>=m_TableRect.left+2&&point.x<m_TableRect.right-VSCROLL_WIDTH-2
-			&&point.y>=m_TableRect.top+2&&point.y<m_TableRect.bottom-2)
-		{
-			//转换点在table中的逻辑坐标
-
-			int y_offset = m_VScrollBarHeight>0?m_VScrollBarYOffset*(m_TableRect.Height()-4)/m_VScrollBarHeight:0;
-			int y = point.y-(m_TableRect.top+2)+y_offset;
-			int x =  point.x-(m_TableRect.left+2)-m_TableRectXOffset;
-
-			int row = y/(HEIGHT+PADDING) + (y%(HEIGHT+PADDING)>0?1:0);
-			int column = x/(WIDTH+PADDING) + (x%(WIDTH+PADDING)>0?1:0);
-
-			if(y<row*(HEIGHT+PADDING) -PADDING && x<column*(WIDTH+PADDING) -PADDING)   //点中的是桌子(而不是间隔)
-			{
-				m_CurStatus = Status_Playing;
-				m_SelectTableIndex = (row-1)*TABLE_NUM+(column-1);
-
-				CString temp;
-				temp.Format(_T("Into Table[%d]\r\n"), m_SelectTableIndex+1);
-				AppendMsg(temp);
-
-				//KillTimer(2);
-				temp.Format(_T("->房间[%02d]"), m_SelectRoomIndex+1);
-				GetDlgItem(IDC_STATIC_ROOM)->SetWindowText(temp);
-				GetDlgItem(IDC_STATIC_ROOM)->ShowWindow(SW_NORMAL);
-				temp.Format(_T("->桌子[%02d]"), m_SelectTableIndex+1);
-				GetDlgItem(IDC_STATIC_TABLE)->SetWindowText(temp);
-				GetDlgItem(IDC_STATIC_TABLE)->ShowWindow(SW_NORMAL);
-
-				InvalidateRect(&m_TableRect);
-				OnAddGame();
-			}
-			
-		}
-	}
-
-	CDialog::OnLButtonDblClk(nFlags, point);
-}
-
-void CTractorGameDlg::OnBnClickedStartgame()
-{
-	if(!m_RoomSocket.IsConnected)
-	{
-		m_CurStatus = Status_PrintTableList;
-		IntoRoomReq();
-		return;
-	}
-
-	assert(m_SelectRoomIndex>=0 && m_SelectRoom.RoomID>=0);
-
-	//Send AddGame request
-	KVData kvdata(true);
-	kvdata.SetValue(KEY_Protocol, PRO_StartGame);
-	kvdata.SetValue(KEY_RoomID, m_SelectRoom.RoomID);
-	kvdata.SetValue(KEY_TableID, m_SelectTableIndex);
-	kvdata.SetValue(KEY_ClientID, m_UID);
-	kvdata.SetValue(KEY_ClientName, m_UName);
-
-	KVDataProtocolFactory factory;
-	unsigned int header_size = factory.HeaderSize();
-	unsigned int body_size = kvdata.Size();
-	ProtocolContext *context = new ProtocolContext(header_size+body_size);
-	context->type = DTYPE_BIN;
-	context->Info = "StartGame";
-
-	kvdata.Serialize(context->Buffer+header_size);
-	context->Size = header_size+body_size;
-	factory.EncodeHeader(context->Buffer, body_size);
-
-	m_RoomSocket.m_SendContext = context;
-	m_RoomSocket.AsyncSelect(FD_WRITE|FD_READ|FD_CLOSE);
-
-	CString temp;
-	temp.Format(_T("send StartGame request\r\n"));
-	AppendMsg(temp);
-}
-
-void CTractorGameDlg::OnBnClickedAddgame()
-{
-	if(!m_RoomSocket.IsConnected)
-	{
-		m_CurStatus = Status_PrintTableList;
-		IntoRoomReq();
-	}
-	else
-		OnAddGame();
-}
 
 void CTractorGameDlg::DrawPoker(CDC *dc, CRect &rect, CBitmap *poker_bitmap)
 {
@@ -1293,7 +1480,7 @@ void CTractorGameDlg::DrawPoker(CDC *dc, CRect &rect, CBitmap *poker_bitmap)
 	old_bitmap = mem_dc.SelectObject(poker_bitmap);
 
 	//3. 绘图
-	dc->TransparentBlt(rect.left, rect.top, rect.Width(), rect.Height(), &  mem_dc , 0, 0, 100, 140,  RGB(255,0,255) );
+	dc->TransparentBlt(rect.left, rect.top, rect.Width(), rect.Height(), &  mem_dc , 0, 0, rect.Width(), rect.Height(),  RGB(255,0,255) );
 
 	//4. 恢复
 	mem_dc.SelectObject( old_bitmap);
