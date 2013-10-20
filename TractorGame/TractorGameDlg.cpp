@@ -660,7 +660,7 @@ bool CTractorGameDlg::OnRoomInfoBroadCast(KVData *kvdata)
 		CString temp;
 		temp.Format(_T("房间[%02d] %d人"), m_SelectRoom.RoomID, m_SelectRoom.ClientNum);
 		GetDlgItem(IDC_STATIC_ROOM)->SetWindowText(temp);
-		InvalidateRect(m_TableRect);
+		InvalidateRect(m_TableRect, FALSE);
 	}
 
 	return true;
@@ -742,7 +742,7 @@ void CTractorGameDlg::OnAddGameRsp(KVData *kvdata)
 		GetDlgItem(IDC_ADDGAME)->ShowWindow(SW_HIDE);
 	}
 
-	InvalidateRect(&m_TableRect);
+	InvalidateRect(&m_TableRect, FALSE);
 }
 
 void CTractorGameDlg::OnAddGameBroadCast(KVData *kvdata)
@@ -776,7 +776,7 @@ void CTractorGameDlg::OnAddGameBroadCast(KVData *kvdata)
 			GetDlgItem(IDC_ADDGAME)->ShowWindow(SW_HIDE);
 	}
 	
-	InvalidateRect(&m_TableRect);
+	InvalidateRect(&m_TableRect, FALSE);
 }
 
 void CTractorGameDlg::OnStartGameBroadCast(KVData *kvdata)
@@ -792,7 +792,7 @@ void CTractorGameDlg::OnStartGameBroadCast(KVData *kvdata)
 		if(m_Player[i].client_id == client_id)
 		{
 			m_Player[i].status = 3;
-			InvalidateRect(&m_TableRect);
+			InvalidateRect(&m_TableRect, FALSE);
 			break;
 		}
 	}
@@ -847,7 +847,7 @@ void CTractorGameDlg::OnQuitGameBroadCast(KVData *kvdata)
 		}
 	}
 
-	InvalidateRect(&m_TableRect);
+	InvalidateRect(&m_TableRect, FALSE);
 }
 
 
@@ -895,7 +895,7 @@ void CTractorGameDlg::OnDealPoker(KVData *kvdata)
 			m_Player[i].poker.push_back(-1);
 	}
 
-	InvalidateRect(&m_TableRect);
+	InvalidateRect(&m_TableRect, FALSE);
 
 	CString msg;
 	msg.Format(_T("OnDealPoker:cur Poker=%u\r\n"), m_Player[my_index].poker.size());
@@ -1015,7 +1015,7 @@ void CTractorGameDlg::OnMouseMove(UINT nFlags, CPoint point)
 			if(y_offset >= 0 && y_offset+m_VScrollBarHeight<=m_TableRect.Height())
 			{
 				m_VScrollBarYOffset = y_offset;				
-				InvalidateRect(&m_TableRect);
+				InvalidateRect(&m_TableRect, FALSE);
 			}
 		}
 	}
@@ -1056,7 +1056,7 @@ void CTractorGameDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
 				GetDlgItem(IDC_STATIC_TABLE)->SetWindowText(temp);
 				GetDlgItem(IDC_STATIC_TABLE)->ShowWindow(SW_NORMAL);
 
-				InvalidateRect(&m_TableRect);
+				InvalidateRect(&m_TableRect, FALSE);
 				AddGameReq();
 			}
 
@@ -1083,7 +1083,7 @@ void CTractorGameDlg::OnBnClickedStartgame()
 		m_Player[i].status = 3;  //开始
 		m_MyStatus = 3;
 
-		InvalidateRect(&m_TableRect);
+		InvalidateRect(&m_TableRect, FALSE);
 		GetDlgItem(IDC_STARTGAME)->ShowWindow(SW_HIDE);
 		break;
 	}
