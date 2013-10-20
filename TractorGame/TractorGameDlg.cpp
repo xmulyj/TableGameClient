@@ -842,7 +842,7 @@ void CTractorGameDlg::OnQuitGameBroadCast(KVData *kvdata)
 		if(m_Audience[i].client_id == client_id)
 		{
 			if(i < m_Audience.size()-1)
-				m_Player[i] = m_Audience[m_Audience.size()-1];
+				m_Audience[i] = m_Audience[m_Audience.size()-1];
 			m_Audience.pop_back();
 		}
 	}
